@@ -1,0 +1,39 @@
+{
+  "name": "checkout-embed",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "nx run-many -t build",
+    "typecheck": "nx run-many -t typecheck",
+    "test": "nx run-many -t test",
+    "lint": "biome check . && stylelint \"**/*.scss\" --allow-empty-input",
+    "lint:fix": "biome check --write . && stylelint \"**/*.scss\" --allow-empty-input --fix",
+    "format": "biome format --write .",
+    "graph": "nx graph",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
+    "@changesets/cli": "^3.0.2",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.4.1",
+    "nx": "^23.2.0",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard-scss": "^17.0.0",
+    "typescript": "^7.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "nx",
+      "@biomejs/biome"
+    ]
+  }
+}
