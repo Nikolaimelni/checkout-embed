@@ -23,7 +23,15 @@
       },
       "style": {
         "noDefaultExport": "error",
-        "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } }
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": {
+            "syntax": "shorthand"
+          }
+        }
+      },
+      "complexity": {
+        "useLiteralKeys": "off"
       }
     }
   },
