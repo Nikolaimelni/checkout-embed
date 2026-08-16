@@ -1,0 +1,189 @@
+import type { PaymentMethod } from '@checkout-embed/contracts';
+import { type Logger, silentLogger } from '../adapters/logger.js';
+import type { CheckoutAction, CheckoutState } from './state.js';
+
+/**
+ * Roughly two minutes at a two second interval. Past that the mock PSP has stopped
+ * answering and so has any real one.
+ */
+export const DEFAULT_MAX_POLL_ATTEMPTS = 60;
+
+type Applied = { readonly next: CheckoutState } | { readonly dropped: string };
+
+export type CheckoutReducerOptions = {
+  readonly logger?: Logger;
+  readonly maxPollAttempts?: number;
+};
+
+export type CheckoutReducer = (state: CheckoutState, action: CheckoutAction) => CheckoutState;
+
+function noTransition(state: CheckoutState, action: CheckoutAction): Applied {
+  return { dropped: `no transition from ${state.status} on ${action.type}` };
+}
+
+function failed(
+  methods: readonly PaymentMethod[],
+  action: Extract<CheckoutAction, { type: 'payment/failed' }>,
+): CheckoutState {
+  return {
+    status: 'failed',
+    methods,
+    failure: action.failure,
+    retryable: action.retryable,
+  };
+}
+
+function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: number): Applied {
+  switch (state.status) {
+    case 'idle':
+      return action.type === 'methods/loaded'
+        ? { next: { status: 'methods', methods: action.methods } }
+        : noTransition(state, action);
+
+    case 'methods':
+      switch (action.type) {
+        case 'methods/loaded':
+          return { next: { status: 'methods', methods: action.methods } };
+        case 'method/selected': {
+          const method = state.methods.find((candidate) => candidate.id === action.methodId);
+          return method
+            ? { next: { status: 'details', methods: state.methods, method } }
+            : { dropped: `no method with id ${action.methodId}` };
+        }
+        case 'payment/failed':
+          return { next: failed(state.methods, action) };
+        default:
+          return noTransition(state, action);
+      }
+
+    case 'details':
+      switch (action.type) {
+        case 'intent/created':
+          return {
+            next: {
+              status: 'confirming',
+              methods: state.methods,
+              method: state.method,
+              intent: action.intent,
+            },
+          };
+        case 'details/dismissed':
+          return { next: { status: 'methods', methods: state.methods } };
+        case 'payment/failed':
+          return { next: failed(state.methods, action) };
+        default:
+          return noTransition(state, action);
+      }
+
+    case 'confirming':
+      switch (action.type) {
+        case 'action/required':
+          return {
+            next: {
+              status: 'requires_action',
+              methods: state.methods,
+              method: state.method,
+              intent: state.intent,
+              actionUrl: action.actionUrl,
+            },
+          };
+        case 'payment/succeeded':
+          return { next: { status: 'succeeded', intent: action.intent } };
+        case 'payment/failed':
+          return { next: failed(state.methods, action) };
+        default:
+          return noTransition(state, action);
+      }
+
+    case 'requires_action':
+      switch (action.type) {
+        case 'action/completed':
+          return {
+            next: {
+              status: 'polling',
+              methods: state.methods,
+              method: state.method,
+              intent: state.intent,
+              attempt: 0,
+            },
+          };
+        case 'payment/failed':
+          return { next: failed(state.methods, action) };
+        default:
+          return noTransition(state, action);
+      }
+
+    case 'polling':
+      switch (action.type) {
+        case 'poll/tick': {
+          const attempt = state.attempt + 1;
+          if (attempt > maxPollAttempts) {
+            return {
+              next: {
+                status: 'failed',
+                methods: state.methods,
+                failure: { code: 'timeout', message: 'The payment did not settle in time.' },
+                retryable: true,
+              },
+            };
+          }
+          return {
+            next: {
+              status: 'polling',
+              methods: state.methods,
+              method: state.method,
+              intent: action.intent,
+              attempt,
+            },
+          };
+        }
+        case 'payment/succeeded':
+          return { next: { status: 'succeeded', intent: action.intent } };
+        case 'payment/failed':
+          return { next: failed(state.methods, action) };
+        default:
+          return noTransition(state, action);
+      }
+
+    case 'succeeded':
+      return action.type === 'checkout/reset'
+        ? { next: { status: 'idle' } }
+        : noTransition(state, action);
+
+    case 'failed':
+      switch (action.type) {
+        case 'checkout/retried':
+          return state.retryable
+            ? { next: { status: 'methods', methods: state.methods } }
+            : { dropped: 'the failure is not retryable' };
+        case 'checkout/reset':
+          return { next: { status: 'idle' } };
+        default:
+          return noTransition(state, action);
+      }
+  }
+}
+
+/**
+ * A pure reducer with one injected port. An action the current state has no transition
+ * for is dropped and logged, never applied halfway: this is the difference between a
+ * widget that shows the wrong screen and one that shows the same screen twice.
+ *
+ * Dropping returns the state by identity, so a React consumer bails out of the render.
+ */
+export function createCheckoutReducer(options: CheckoutReducerOptions = {}): CheckoutReducer {
+  const logger = options.logger ?? silentLogger;
+  const maxPollAttempts = options.maxPollAttempts ?? DEFAULT_MAX_POLL_ATTEMPTS;
+
+  return (state, action) => {
+    const result = apply(state, action, maxPollAttempts);
+    if ('next' in result) return result.next;
+
+    logger.log('warn', 'checkout: action dropped', {
+      status: state.status,
+      action: action.type,
+      why: result.dropped,
+    });
+    return state;
+  };
+}
