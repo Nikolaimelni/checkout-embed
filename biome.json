@@ -57,7 +57,9 @@
         "apps/demo-host-next/**/*.tsx",
         "apps/demo-host-next/**/*.ts",
         "**/*.config.ts",
-        "**/*.config.mjs"
+        "**/*.config.mjs",
+        "**/.storybook/*.ts",
+        "**/*.stories.tsx"
       ],
       "linter": {
         "rules": {

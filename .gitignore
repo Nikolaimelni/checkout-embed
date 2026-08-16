@@ -29,3 +29,5 @@ Thumbs.db
 
 # compiled from scss, rebuilt by pnpm styles
 *.generated.ts
+
+storybook-static/

@@ -37,6 +37,11 @@
     ],
     "overrides": {
       "tsup>esbuild": "^0.28.2"
+    },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "@vitejs/plugin-react>oxc-transform-react": "0.148.x"
+      }
     }
   }
 }
