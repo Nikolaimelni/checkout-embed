@@ -110,7 +110,7 @@ export function createDriver(options: DriverOptions): Driver {
         case 'challenge-finished': {
           if (state.status !== 'requires_action') return;
           const settled = state.intent;
-          dispatch({ type: 'action/completed' });
+          dispatch({ type: 'poll/started' });
           later({ type: 'payment/succeeded', intent: settled });
           return;
         }

@@ -62,7 +62,7 @@ export type CheckoutAction =
   | { readonly type: 'details/dismissed' }
   | { readonly type: 'intent/created'; readonly intent: PaymentIntent }
   | { readonly type: 'action/required'; readonly actionUrl: string }
-  | { readonly type: 'action/completed' }
+  | { readonly type: 'poll/started' }
   | { readonly type: 'poll/tick'; readonly intent: PaymentIntent }
   | { readonly type: 'payment/succeeded'; readonly intent: PaymentIntent }
   | {

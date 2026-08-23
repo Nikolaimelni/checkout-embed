@@ -77,6 +77,19 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
 
     case 'confirming':
       switch (action.type) {
+        // The provider answered 'processing' rather than handing back a challenge. There
+        // is nothing for anyone to do but wait, which is the same waiting the machine
+        // already knows how to do after a challenge.
+        case 'poll/started':
+          return {
+            next: {
+              status: 'polling',
+              methods: state.methods,
+              method: state.method,
+              intent: state.intent,
+              attempt: 0,
+            },
+          };
         case 'action/required':
           return {
             next: {
@@ -97,7 +110,7 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
 
     case 'requires_action':
       switch (action.type) {
-        case 'action/completed':
+        case 'poll/started':
           return {
             next: {
               status: 'polling',

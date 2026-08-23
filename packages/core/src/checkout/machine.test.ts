@@ -80,7 +80,7 @@ const ACTIONS: {
   'details/dismissed': { type: 'details/dismissed' },
   'intent/created': { type: 'intent/created', intent },
   'action/required': { type: 'action/required', actionUrl: challengeUrl },
-  'action/completed': { type: 'action/completed' },
+  'poll/started': { type: 'poll/started' },
   'poll/tick': { type: 'poll/tick', intent },
   'payment/succeeded': { type: 'payment/succeeded', intent },
   'payment/failed': { type: 'payment/failed', failure: declined, retryable: true },
@@ -107,11 +107,12 @@ const EXPECTED: Readonly<
     'payment/failed': 'failed',
   },
   confirming: {
+    'poll/started': 'polling',
     'action/required': 'requires_action',
     'payment/succeeded': 'succeeded',
     'payment/failed': 'failed',
   },
-  requires_action: { 'action/completed': 'polling', 'payment/failed': 'failed' },
+  requires_action: { 'poll/started': 'polling', 'payment/failed': 'failed' },
   polling: {
     'poll/tick': 'polling',
     'payment/succeeded': 'succeeded',
@@ -175,7 +176,7 @@ describe('a payment that needs 3DS', () => {
     });
     expect(challenged).toMatchObject({ status: 'requires_action', actionUrl: challengeUrl });
 
-    const polling = reduce(challenged, { type: 'action/completed' });
+    const polling = reduce(challenged, { type: 'poll/started' });
     expect(polling).toMatchObject({ status: 'polling', attempt: 0 });
 
     const settled = reduce(polling, { type: 'payment/succeeded', intent });
