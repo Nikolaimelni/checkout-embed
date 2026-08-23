@@ -13,6 +13,7 @@ export type Labels = {
   readonly failed: string;
   readonly retry: string;
   readonly close: string;
+  readonly outsideLimits: string;
 };
 
 export const DEFAULT_LABELS: Labels = {
@@ -30,4 +31,5 @@ export const DEFAULT_LABELS: Labels = {
   failed: 'The payment did not go through',
   retry: 'Try again',
   close: 'Close',
+  outsideLimits: 'This amount is outside the limits on your account.',
 };

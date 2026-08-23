@@ -155,3 +155,69 @@ describe('the end of the payment', () => {
     expect(onIntent).toHaveBeenCalledWith({ type: 'dismiss' });
   });
 });
+
+describe('what the host pushes in', () => {
+  function showWith(state: CheckoutState, host: Parameters<typeof CheckoutView>[0]['host']) {
+    const onIntent = vi.fn<(intent: WidgetIntent) => void>();
+    render(
+      <CheckoutView state={state} total={total} locale="en-US" host={host} onIntent={onIntent} />,
+    );
+    return onIntent;
+  }
+
+  const empty = { balance: null, limits: null, blockingMessage: null } as const;
+
+  it('replaces the screen with the message the merchant is blocking on', () => {
+    showWith(states['methods'] as CheckoutState, {
+      ...empty,
+      blockingMessage: 'Your account is under review.',
+    });
+
+    // Twice on purpose: once where it can be seen, once in the live region that
+    // announces it. The selector picks the visible one.
+    expect(
+      screen.getByText('Your account is under review.', { selector: '.failure' }),
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Card$/ })).not.toBeInTheDocument();
+  });
+
+  it('announces the block rather than the screen behind it', () => {
+    showWith(states['methods'] as CheckoutState, { ...empty, blockingMessage: 'Under review.' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Under review.');
+  });
+
+  it('refuses to pay an amount above the limit the host gave', () => {
+    showWith(states['details'] as CheckoutState, {
+      ...empty,
+      limits: { minMinor: 100, maxMinor: 500 },
+    });
+
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeDisabled();
+    expect(screen.getByText(/outside the limits/i)).toBeInTheDocument();
+  });
+
+  it('refuses one below it too', () => {
+    showWith(states['details'] as CheckoutState, {
+      ...empty,
+      limits: { minMinor: 5000, maxMinor: 50_000 },
+    });
+
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeDisabled();
+  });
+
+  it('lets an amount inside the limits through', () => {
+    showWith(states['details'] as CheckoutState, {
+      ...empty,
+      limits: { minMinor: 100, maxMinor: 100_000 },
+    });
+
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeEnabled();
+  });
+
+  it('does nothing when the host has pushed nothing', () => {
+    showWith(states['details'] as CheckoutState, empty);
+
+    expect(screen.getByRole('button', { name: 'Pay' })).toBeEnabled();
+  });
+});

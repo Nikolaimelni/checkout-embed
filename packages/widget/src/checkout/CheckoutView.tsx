@@ -1,4 +1,4 @@
-import type { Money } from '@checkout-embed/contracts';
+import type { HostMessage, Money } from '@checkout-embed/contracts';
 import type { CheckoutState } from '@checkout-embed/core';
 import type { ReactNode } from 'react';
 import { Challenge } from './Challenge.js';
@@ -6,6 +6,12 @@ import { Button } from './HostElement.js';
 import type { WidgetIntent } from './intents.js';
 import { DEFAULT_LABELS, type Labels } from './labels.js';
 import { formatMoney } from './money.js';
+
+/**
+ * What the merchant pushes in through instance.update(). Derived from the schema that
+ * validates it rather than restated, so the two cannot drift.
+ */
+export type HostState = Omit<Extract<HostMessage, { type: 'host/update' }>, 'type'>;
 
 export type HostComponents = {
   readonly button?: string | undefined;
@@ -17,8 +23,16 @@ export type CheckoutViewProps = {
   readonly locale: string;
   readonly labels?: Partial<Labels> | undefined;
   readonly components?: HostComponents | undefined;
+  readonly host?: HostState | undefined;
   readonly onIntent: (intent: WidgetIntent) => void;
 };
+
+function isOutsideLimits(total: Money, host: HostState | undefined): boolean {
+  const limits = host?.limits;
+  if (!limits) return false;
+
+  return total.amountMinor < limits.minMinor || total.amountMinor > limits.maxMinor;
+}
 
 function announcementFor(state: CheckoutState, labels: Labels): string {
   switch (state.status) {
@@ -47,9 +61,11 @@ export function CheckoutView({
   locale,
   labels: overrides,
   components,
+  host,
   onIntent,
 }: CheckoutViewProps): ReactNode {
   const labels = { ...DEFAULT_LABELS, ...overrides };
+  const outsideLimits = isOutsideLimits(total, host);
   const buttonTag = components?.button;
 
   return (
@@ -60,10 +76,10 @@ export function CheckoutView({
       {/* Always in the tree, never empty on arrival: a live region inserted at the same
           moment as its text is not announced by most screen readers. */}
       <p className="visually-hidden" role="status" aria-live="polite">
-        {announcementFor(state, labels)}
+        {host?.blockingMessage ?? announcementFor(state, labels)}
       </p>
 
-      {renderBody()}
+      {host?.blockingMessage ? <p className="failure">{host.blockingMessage}</p> : renderBody()}
     </div>
   );
 
@@ -94,8 +110,13 @@ export function CheckoutView({
         return (
           <>
             <p className="status">{state.method.label}</p>
+            {outsideLimits ? <p className="failure">{labels.outsideLimits}</p> : null}
             <div className="actions">
-              <Button hostTag={buttonTag} onClick={() => onIntent({ type: 'pay' })}>
+              <Button
+                hostTag={buttonTag}
+                disabled={outsideLimits}
+                onClick={() => onIntent({ type: 'pay' })}
+              >
                 {labels.pay}
               </Button>
               <Button

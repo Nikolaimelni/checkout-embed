@@ -2,7 +2,7 @@ import type { Money } from '@checkout-embed/contracts';
 import { CheckoutError, type CheckoutState } from '@checkout-embed/core';
 import { useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CheckoutView, type HostComponents } from './checkout/CheckoutView.js';
+import { CheckoutView, type HostComponents, type HostState } from './checkout/CheckoutView.js';
 import type { WidgetIntent } from './checkout/intents.js';
 import type { Labels } from './checkout/labels.js';
 import { adoptStyles } from './styles/adopt.js';
@@ -19,6 +19,7 @@ export type WidgetInput = {
   readonly locale?: string | undefined;
   readonly labels?: Partial<Labels> | undefined;
   readonly components?: HostComponents | undefined;
+  readonly host?: HostState | undefined;
   readonly onIntent: (intent: WidgetIntent) => void;
 };
 
@@ -56,6 +57,7 @@ function Mounted({ input }: Props) {
       locale={input.locale ?? 'en'}
       labels={input.labels}
       components={input.components}
+      host={input.host}
       onIntent={input.onIntent}
     />
   );

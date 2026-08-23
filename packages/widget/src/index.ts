@@ -2,6 +2,7 @@ export {
   CheckoutView,
   type CheckoutViewProps,
   type HostComponents,
+  type HostState,
 } from './checkout/CheckoutView.js';
 export type { WidgetIntent } from './checkout/intents.js';
 export { DEFAULT_LABELS, type Labels } from './checkout/labels.js';
