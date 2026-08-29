@@ -95,7 +95,7 @@ const ACTIONS: {
 const EXPECTED: Readonly<
   Record<CheckoutStatus, Partial<Record<CheckoutActionType, CheckoutStatus>>>
 > = {
-  idle: { 'methods/loaded': 'methods' },
+  idle: { 'methods/loaded': 'methods', 'payment/failed': 'failed' },
   methods: {
     'methods/loaded': 'methods',
     'method/selected': 'details',

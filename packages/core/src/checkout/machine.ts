@@ -36,9 +36,16 @@ function failed(
 function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: number): Applied {
   switch (state.status) {
     case 'idle':
-      return action.type === 'methods/loaded'
-        ? { next: { status: 'methods', methods: action.methods } }
-        : noTransition(state, action);
+      switch (action.type) {
+        case 'methods/loaded':
+          return { next: { status: 'methods', methods: action.methods } };
+        // A provider that is down before the list ever loads still has to say so. Without
+        // this the widget sits on its loading line for as long as the page is open.
+        case 'payment/failed':
+          return { next: failed([], action) };
+        default:
+          return noTransition(state, action);
+      }
 
     case 'methods':
       switch (action.type) {
