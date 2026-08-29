@@ -16,7 +16,8 @@
     "lint:fix": "biome check --write . && stylelint \"**/*.scss\" --allow-empty-input --fix",
     "format": "biome format --write .",
     "graph": "nx graph",
-    "prepare": "husky"
+    "prepare": "husky",
+    "size": "nx run-many -t size"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",

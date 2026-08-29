@@ -1,0 +1,52 @@
+{
+  "name": "@checkout-embed/sdk",
+  "version": "0.0.0",
+  "description": "The loader, the call queue and the public lifecycle a merchant integrates against",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": [
+    "./dist/loader.js",
+    "./dist/bundle.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./loader": "./dist/loader.js",
+    "./bundle": "./dist/bundle.js"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "size": "size-limit"
+  },
+  "dependencies": {
+    "@checkout-embed/contracts": "workspace:^",
+    "@checkout-embed/core": "workspace:^",
+    "@checkout-embed/widget": "workspace:^",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@size-limit/preset-small-lib": "^13.0.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "size-limit": "^13.0.3",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  }
+}

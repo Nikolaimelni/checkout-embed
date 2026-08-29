@@ -1,0 +1,9 @@
+[
+  {
+    "name": "loader",
+    "path": "dist/loader.js",
+    "limit": "2 kB",
+    "gzip": true,
+    "brotli": false
+  }
+]

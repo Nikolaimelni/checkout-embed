@@ -31,3 +31,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+      # After build, because the budget is measured on the artifact and not on the source.
+      - run: pnpm size

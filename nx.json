@@ -25,6 +25,11 @@
     "test": {
       "inputs": ["default", "^production"],
       "cache": true
+    },
+    "size": {
+      "dependsOn": ["build"],
+      "inputs": ["production"],
+      "cache": true
     }
   },
   "defaultBase": "main"
