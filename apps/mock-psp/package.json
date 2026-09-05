@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@checkout-embed/contracts": "workspace:^",
+    "cors": "^2.8.6",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
@@ -26,6 +27,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.4.1",
     "@types/supertest": "^7.2.1",

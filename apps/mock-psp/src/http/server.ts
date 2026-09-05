@@ -37,6 +37,7 @@ const app = createApp({
   merchantKeys: env.merchantKeys,
   bundleUrl: env.WIDGET_BUNDLE_URL,
   publicBaseUrl: env.PUBLIC_BASE_URL,
+  allowedOrigins: env.allowedOrigins,
 });
 
 const server = app.listen(env.PORT, () => {

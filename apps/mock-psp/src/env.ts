@@ -20,10 +20,16 @@ const EnvSchema = z.object({
   WEBHOOK_SECRET: z.string().min(16).default(DEV_WEBHOOK_SECRET),
   /** Comma separated. A key outside this list gets a 404 from the config route. */
   MERCHANT_KEYS: z.string().min(1).default('mk_test_acme'),
+  /** Comma separated origins, or * to answer anyone. An embedded checkout is always
+   * cross origin, so this is not optional in the way it is for a normal API. */
+  ALLOWED_ORIGINS: z.string().min(1).default('*'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
-export type Env = z.infer<typeof EnvSchema> & { readonly merchantKeys: readonly string[] };
+export type Env = z.infer<typeof EnvSchema> & {
+  readonly merchantKeys: readonly string[];
+  readonly allowedOrigins: readonly string[] | '*';
+};
 
 function load(): Env {
   const parsed = EnvSchema.safeParse(process.env);
@@ -39,11 +45,17 @@ function load(): Env {
     throw new Error('WEBHOOK_SECRET still holds the development default. Set a real one.');
   }
 
+  const list = (value: string): readonly string[] =>
+    value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+
   return {
     ...parsed.data,
-    merchantKeys: parsed.data.MERCHANT_KEYS.split(',')
-      .map((key) => key.trim())
-      .filter((key) => key.length > 0),
+    merchantKeys: list(parsed.data.MERCHANT_KEYS),
+    allowedOrigins:
+      parsed.data.ALLOWED_ORIGINS.trim() === '*' ? '*' : list(parsed.data.ALLOWED_ORIGINS),
   };
 }
 

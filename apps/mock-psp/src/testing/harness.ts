@@ -53,6 +53,7 @@ export async function createHarness(startAt = 1_760_000_000_000): Promise<Harnes
     merchantKeys: [MERCHANT_KEY],
     bundleUrl: 'https://cdn.test/checkout.js',
     publicBaseUrl: PUBLIC_BASE_URL,
+    allowedOrigins: '*',
     rateLimit: false,
   });
 

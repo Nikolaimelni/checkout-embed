@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express, { type Express } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -20,6 +21,8 @@ export type AppOptions = {
   readonly merchantKeys: readonly string[];
   readonly bundleUrl: string;
   readonly publicBaseUrl: string;
+  /** Origins allowed to call /v1, or '*' for anyone. */
+  readonly allowedOrigins: readonly string[] | '*';
   /** False in tests, where a shared counter across cases is just a source of flakiness. */
   readonly rateLimit?: RateLimitOptions | false;
 };
@@ -64,6 +67,22 @@ export function createApp(options: AppOptions): Express {
         .json({ error: { code: 'internal', message: 'The database did not answer.' } });
     }
   });
+
+  // An embedded checkout runs on the merchant's origin and calls this one, so every /v1
+  // request is cross origin and every one of them is preflighted: the SDK sends both
+  // Authorization and Idempotency-Key, neither of which is a simple header.
+  app.use(
+    '/v1',
+    cors({
+      origin: options.allowedOrigins === '*' ? true : [...options.allowedOrigins],
+      methods: ['GET', 'POST', 'OPTIONS'],
+      allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-request-id'],
+      // Bearer tokens, not cookies. Allowing credentials would rule out the '*' origin
+      // and buy nothing.
+      credentials: false,
+      maxAge: 600,
+    }),
+  );
 
   const limits = options.rateLimit ?? { windowMs: 60_000, limit: 120 };
   if (limits !== false) {

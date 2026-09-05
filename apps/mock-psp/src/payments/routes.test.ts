@@ -266,3 +266,27 @@ describe('GET /healthz', () => {
     expect(response.body).toEqual({ status: 'ok', database: 'up' });
   });
 });
+
+describe('cross origin access', () => {
+  it('answers the preflight an embedded checkout always triggers', async () => {
+    const response = await request(harness.app)
+      .options('/v1/payment-intents')
+      .set('origin', 'https://shop.example')
+      .set('access-control-request-method', 'POST')
+      .set('access-control-request-headers', 'authorization,idempotency-key');
+
+    expect(response.status).toBeLessThan(300);
+    expect(response.headers['access-control-allow-origin']).toBeDefined();
+    expect(response.headers['access-control-allow-headers']?.toLowerCase()).toContain(
+      'idempotency-key',
+    );
+  });
+
+  it('lets the answer itself be read from another origin', async () => {
+    const response = await request(harness.app)
+      .get(`/v1/config/${MERCHANT_KEY}`)
+      .set('origin', 'https://shop.example');
+
+    expect(response.headers['access-control-allow-origin']).toBeDefined();
+  });
+});
