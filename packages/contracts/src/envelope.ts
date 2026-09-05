@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { int, iso, literal, object, string } from 'zod';
 import { MESSAGE_SOURCE, PROTOCOL_VERSION } from './protocol.js';
 
 export type Envelope<TPayload> = {
@@ -12,11 +13,11 @@ export type Envelope<TPayload> = {
 export function envelopeOf<TPayload>(
   payload: z.ZodType<TPayload>,
 ): z.ZodType<Envelope<TPayload>, unknown> {
-  return z.object({
-    source: z.literal(MESSAGE_SOURCE),
-    protocolVersion: z.int().positive(),
-    id: z.string().min(1),
-    sentAt: z.iso.datetime(),
+  return object({
+    source: literal(MESSAGE_SOURCE),
+    protocolVersion: int().positive(),
+    id: string().min(1),
+    sentAt: iso.datetime(),
     payload,
   });
 }

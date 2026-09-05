@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { string } from 'zod';
 
 /**
  * Names the HTML spec reserves. They contain a dash but may not be used for a custom
@@ -21,8 +22,7 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set([
  * a string from someone else's config, so it is checked here rather than at the
  * customElements.get call site.
  */
-export const CustomElementNameSchema = z
-  .string()
+export const CustomElementNameSchema = string()
   .regex(/^[a-z][a-z0-9._]*-[a-z0-9._-]*$/, {
     error: 'expected a lowercase custom element name containing a dash',
   })

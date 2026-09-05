@@ -5,5 +5,12 @@
     "limit": "2 kB",
     "gzip": true,
     "brotli": false
+  },
+  {
+    "name": "browser bundle",
+    "path": "dist/bundle.js",
+    "limit": "110 kB",
+    "gzip": true,
+    "brotli": false
   }
 ]

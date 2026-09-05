@@ -1,6 +1,6 @@
 import { FocusScope } from '@react-aria/focus';
 import { type ReactNode, useEffect, useRef } from 'react';
-import { z } from 'zod';
+import { boolean, literal, object, string } from 'zod';
 import { Button } from './HostElement.js';
 import type { Labels } from './labels.js';
 
@@ -13,10 +13,10 @@ import type { Labels } from './labels.js';
  * It is a hint either way. The status still comes from polling the provider, because a
  * message from an iframe is not a receipt.
  */
-const ChallengeResultSchema = z.object({
-  source: z.literal('checkout-embed-3ds'),
-  intentId: z.string().min(1),
-  approved: z.boolean(),
+const ChallengeResultSchema = object({
+  source: literal('checkout-embed-3ds'),
+  intentId: string().min(1),
+  approved: boolean(),
 });
 
 type Props = {

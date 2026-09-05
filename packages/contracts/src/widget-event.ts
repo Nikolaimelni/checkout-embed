@@ -1,19 +1,20 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { discriminatedUnion, int, literal, object } from 'zod';
 import { CheckoutFailureSchema } from './failure.js';
 import { PaymentIntentIdSchema, PaymentMethodIdSchema } from './identifiers.js';
 import { MoneySchema } from './money.js';
 
 /** Widget to host. The public event surface a merchant subscribes to. */
-export const WidgetEventSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('widget:ready') }),
-  z.object({ type: z.literal('widget:resize'), height: z.int().nonnegative() }),
-  z.object({ type: z.literal('method:selected'), methodId: PaymentMethodIdSchema }),
-  z.object({
-    type: z.literal('payment:success'),
+export const WidgetEventSchema = discriminatedUnion('type', [
+  object({ type: literal('widget:ready') }),
+  object({ type: literal('widget:resize'), height: int().nonnegative() }),
+  object({ type: literal('method:selected'), methodId: PaymentMethodIdSchema }),
+  object({
+    type: literal('payment:success'),
     intentId: PaymentIntentIdSchema,
     money: MoneySchema,
   }),
-  z.object({ type: z.literal('payment:error'), failure: CheckoutFailureSchema }),
+  object({ type: literal('payment:error'), failure: CheckoutFailureSchema }),
 ]);
 
 export type WidgetEvent = z.infer<typeof WidgetEventSchema>;

@@ -1,6 +1,7 @@
-import { z } from 'zod';
+import type { z } from 'zod';
+import { object, string, enum as zEnum } from 'zod';
 
-export const CheckoutErrorCodeSchema = z.enum([
+export const CheckoutErrorCodeSchema = zEnum([
   'network',
   'timeout',
   'declined',
@@ -17,9 +18,9 @@ export type CheckoutErrorCode = z.infer<typeof CheckoutErrorCodeSchema>;
  * The serialisable shape of a failure. Errors thrown inside the widget are class
  * instances; anything that crosses the host boundary is flattened to this.
  */
-export const CheckoutFailureSchema = z.object({
+export const CheckoutFailureSchema = object({
   code: CheckoutErrorCodeSchema,
-  message: z.string().min(1),
+  message: string().min(1),
 });
 
 export type CheckoutFailure = z.infer<typeof CheckoutFailureSchema>;
