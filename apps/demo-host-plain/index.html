@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acme Hardware</title>
+    <style>
+      /* A host page with opinions. The widget below is not supposed to notice any of it. */
+      * {
+        box-sizing: border-box;
+        letter-spacing: 0.02em;
+      }
+      body {
+        margin: 0;
+        font: 16px/1.6 Georgia, "Times New Roman", serif;
+        color: #2b2118;
+        background: #f7f3ec;
+      }
+      main {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px 96px;
+      }
+      h1 {
+        font-size: 30px;
+        margin: 0 0 4px;
+      }
+      .lede {
+        color: #6b5c4a;
+        margin: 0 0 32px;
+      }
+      .line {
+        display: flex;
+        justify-content: space-between;
+        border-top: 1px solid #ddd2c2;
+        padding: 12px 0;
+      }
+      .line.total {
+        border-bottom: 1px solid #ddd2c2;
+        font-weight: 700;
+        margin-bottom: 32px;
+      }
+      #checkout {
+        min-height: 220px;
+      }
+      #receipt:empty {
+        display: none;
+      }
+      #receipt {
+        margin-top: 24px;
+        padding: 12px 16px;
+        background: #e3efe5;
+        border-left: 3px solid #2f6f4a;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Acme Hardware</h1>
+      <p class="lede">No framework on this page. No build step either.</p>
+
+      <div class="line"><span>Bench vice, 150 mm</span><span>&euro;38.00</span></div>
+      <div class="line"><span>Delivery</span><span>&euro;11.99</span></div>
+      <div class="line total"><span>Total</span><span>&euro;49.99</span></div>
+
+      <div id="checkout"></div>
+      <p id="receipt"></p>
+    </main>
+
+    <!--
+      Not async on purpose. The loader is 1.3 kB, so blocking on it costs less than a
+      round trip, and it buys the next script a global that is guaranteed to exist.
+      The bundle it fetches is the asynchronous part, which is what the queue is for.
+    -->
+    <script
+      src="/sdk/loader.js"
+      data-merchant-key="mk_test_acme"
+      data-api-base="http://localhost:4000"
+      data-bundle="/sdk/bundle.js"
+    ></script>
+
+    <script>
+      checkoutEmbed('init', {
+        config: {
+          merchantKey: 'mk_test_acme',
+          environment: 'sandbox',
+          apiBaseUrl: 'http://localhost:4000',
+        },
+        auth: { getToken: () => Promise.resolve('demo-token') },
+      });
+
+      checkoutEmbed('on', 'payment:success', (event) => {
+        document.getElementById('receipt').textContent =
+          'Paid. Reference ' + event.intentId + '.';
+      });
+
+      // The amount picks the outcome at the provider, so the page takes one from the
+      // query string. It is how a person tries a decline without editing a file, and how
+      // the end to end tests reach the 3DS path.
+      var requested = Number(new URLSearchParams(location.search).get('amount'));
+      var amountMinor = Number.isInteger(requested) && requested > 0 ? requested : 4999;
+
+      checkoutEmbed('mount', '#checkout', {
+        amount: { amountMinor: amountMinor, currency: 'EUR' },
+      });
+    </script>
+  </body>
+</html>

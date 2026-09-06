@@ -1,0 +1,26 @@
+{
+  "name": "@checkout-embed/demo-host-next",
+  "version": "0.0.0",
+  "description": "Two routes of Next, to prove the widget comes back out on client navigation",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 5175",
+    "build": "next build",
+    "start": "next start --port 5175",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@checkout-embed/contracts": "workspace:^",
+    "@checkout-embed/sdk": "workspace:^",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "typescript": "^7.0.2"
+  }
+}

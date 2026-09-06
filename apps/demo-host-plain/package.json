@@ -1,0 +1,23 @@
+{
+  "name": "@checkout-embed/demo-host-plain",
+  "version": "0.0.0",
+  "description": "A shop page with no framework, to show that the widget does not need one",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/copy-sdk.ts",
+    "dev": "pnpm sync && vite",
+    "build": "pnpm sync && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@checkout-embed/sdk": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

@@ -17,7 +17,9 @@
     "format": "biome format --write .",
     "graph": "nx graph",
     "prepare": "husky",
-    "size": "nx run-many -t size"
+    "size": "nx run-many -t size",
+    "e2e": "pnpm --filter @checkout-embed/e2e e2e",
+    "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",

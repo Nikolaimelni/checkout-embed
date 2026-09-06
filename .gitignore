@@ -31,3 +31,8 @@ Thumbs.db
 *.generated.ts
 
 storybook-static/
+
+apps/demo-host-plain/public/sdk/
+
+apps/demo-host-next/.next/
+apps/demo-host-next/next-env.d.ts
