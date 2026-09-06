@@ -117,9 +117,15 @@ export function mountWidget(host: Element, input: WidgetInput): WidgetView {
     },
     unmount() {
       instances.delete(host);
-      root.unmount();
+
+      // The container goes at once, so the shadow root is empty the moment this returns.
       disposeStyles();
       container.remove();
+
+      // React refuses to unmount a root synchronously while it is rendering, and a host
+      // calling this from its own effect cleanup is doing precisely that. This root is not
+      // theirs, so letting their pass finish first costs nothing and drops the warning.
+      queueMicrotask(() => root.unmount());
     },
   };
 
