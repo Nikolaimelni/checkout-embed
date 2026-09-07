@@ -1,0 +1,32 @@
+app = "checkout-embed-psp"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  # On the volume, so intents and the webhook queue survive a restart. That is the whole
+  # reason this is SQLite on a disk rather than a Map in memory.
+  DATABASE_URL = "/data/mock-psp.db"
+
+[[mounts]]
+  source = "psp_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # One machine. A SQLite file on one volume cannot be shared, and a demo does not need to.
+  min_machines_running = 0
+  max_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"

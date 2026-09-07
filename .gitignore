@@ -20,6 +20,8 @@ blob-report/
 .env
 .env.*
 !.env.example
+# The plain host substitutes this into its HTML at build time, and it holds a public URL.
+!apps/demo-host-plain/.env
 
 .DS_Store
 Thumbs.db

@@ -75,7 +75,7 @@
     <script
       src="/sdk/loader.js"
       data-merchant-key="mk_test_acme"
-      data-api-base="http://localhost:4000"
+      data-api-base="%VITE_PSP_URL%"
       data-bundle="/sdk/bundle.js"
     ></script>
 
@@ -84,7 +84,7 @@
         config: {
           merchantKey: 'mk_test_acme',
           environment: 'sandbox',
-          apiBaseUrl: 'http://localhost:4000',
+          apiBaseUrl: '%VITE_PSP_URL%',
         },
         auth: { getToken: () => Promise.resolve('demo-token') },
       });
