@@ -8,6 +8,23 @@
     "./dist/loader.js",
     "./dist/bundle.js"
   ],
+  "keywords": [
+    "payments",
+    "checkout",
+    "embed",
+    "sdk",
+    "loader",
+    "shadow-dom"
+  ],
+  "homepage": "https://github.com/Nikolaimelni/checkout-embed#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nikolaimelni/checkout-embed.git",
+    "directory": "packages/sdk"
+  },
+  "bugs": {
+    "url": "https://github.com/Nikolaimelni/checkout-embed/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -30,6 +47,10 @@
     "test": "vitest run",
     "size": "size-limit"
   },
+  "peerDependencies": {
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
   "dependencies": {
     "@checkout-embed/contracts": "workspace:^",
     "@checkout-embed/core": "workspace:^",
@@ -45,9 +66,5 @@
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
-  },
-  "peerDependencies": {
-    "react": ">=19.0.0",
-    "react-dom": ">=19.0.0"
   }
 }

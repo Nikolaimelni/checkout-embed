@@ -5,6 +5,22 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
+  "keywords": [
+    "payments",
+    "checkout",
+    "zod",
+    "schema",
+    "contracts"
+  ],
+  "homepage": "https://github.com/Nikolaimelni/checkout-embed#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nikolaimelni/checkout-embed.git",
+    "directory": "packages/contracts"
+  },
+  "bugs": {
+    "url": "https://github.com/Nikolaimelni/checkout-embed/issues"
+  },
   "publishConfig": {
     "access": "public"
   },
