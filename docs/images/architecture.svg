@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 470" width="880" height="470" role="img" aria-label="How the widget reaches a merchant page: a script tag loads a small loader, the loader asks the provider where the bundle lives, the bundle mounts a widget into a shadow root, and card fields stay inside an iframe served by the provider.">
+  <title>How checkout-embed reaches a merchant page</title>
+
+  <!-- A drawn-on-paper background, so the diagram reads the same in a light or dark theme. -->
+  <rect width="880" height="470" rx="10" fill="#f7f6f3" />
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#6b7671" />
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #c9d0cb; stroke-width: 1.5; }
+      .provider { fill: #f0f4f1; stroke: #b3c3b8; stroke-width: 1.5; }
+      .shadow { fill: #ffffff; stroke: #10695a; stroke-width: 2; }
+      .title { font: 600 15px system-ui, sans-serif; fill: #141a17; }
+      .body { font: 13px system-ui, sans-serif; fill: #55605a; }
+      .mono { font: 12px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: #10695a; }
+      .note { font: italic 12.5px system-ui, sans-serif; fill: #7a857f; }
+      .flow { stroke: #6b7671; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+      .label { font: 12px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: #55605a; }
+    </style>
+  </defs>
+
+  <!-- Merchant page -->
+  <rect class="box" x="32" y="30" width="330" height="86" rx="8" />
+  <text class="title" x="52" y="58">The merchant's page</text>
+  <text class="mono" x="52" y="82">&lt;script src="loader.js" data-merchant-key&gt;</text>
+  <text class="mono" x="52" y="102">&lt;div id="checkout"&gt;</text>
+
+  <!-- Provider -->
+  <rect class="provider" x="530" y="30" width="318" height="86" rx="8" />
+  <text class="title" x="550" y="58">The payment provider</text>
+  <text class="body" x="550" y="82">Intents, 3DS, signed webhooks.</text>
+  <text class="body" x="550" y="102">Another origin, always.</text>
+
+  <!-- loader -->
+  <rect class="box" x="32" y="172" width="330" height="104" rx="8" />
+  <text class="title" x="52" y="200">loader.js <tspan class="note">1.3 kB gzipped</tspan></text>
+  <text class="body" x="52" y="222">Installs a queue, so calls made before</text>
+  <text class="body" x="52" y="240">the bundle lands are not lost.</text>
+  <text class="note" x="52" y="262">Falls back to data-bundle when the call below fails.</text>
+
+  <!-- config arrow -->
+  <path class="flow" d="M 364 198 L 528 120" />
+  <text class="label" x="376" y="150">GET /v1/config/:merchantKey</text>
+
+  <!-- bundle arrow -->
+  <path class="flow" d="M 120 276 L 120 316" />
+  <text class="label" x="134" y="300">injects the bundle</text>
+
+  <!-- shadow root -->
+  <rect class="shadow" x="32" y="322" width="330" height="122" rx="8" />
+  <text class="title" x="52" y="350">Shadow root</text>
+  <text class="body" x="52" y="374">React 19, its own stylesheet, its own root.</text>
+  <text class="body" x="52" y="392">The page outside cannot select into it,</text>
+  <text class="body" x="52" y="410">and nothing in it inherits from the page.</text>
+  <text class="note" x="52" y="432">Never sees a card number.</text>
+
+  <!-- iframe -->
+  <rect class="provider" x="530" y="322" width="318" height="122" rx="8" />
+  <text class="title" x="550" y="350">The provider's iframe</text>
+  <text class="body" x="550" y="374">Card fields and the 3DS challenge,</text>
+  <text class="body" x="550" y="392">served and owned by the provider.</text>
+  <text class="note" x="550" y="416">This is the whole PCI answer: the</text>
+  <text class="note" x="550" y="434">number never crosses the line.</text>
+
+  <!-- iframe arrow -->
+  <path class="flow" d="M 364 400 L 526 400" />
+  <text class="label" x="374" y="388">the widget frames it</text>
+</svg>
