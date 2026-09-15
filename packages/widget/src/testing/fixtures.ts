@@ -29,7 +29,7 @@ export const intent: PaymentIntent = PaymentIntentSchema.parse({
 
 export const CHALLENGE_URL = 'https://psp.test/3ds/pi_1';
 
-export const states: Readonly<Record<string, CheckoutState>> = {
+export const states = {
   idle: { status: 'idle' },
   methods: { status: 'methods', methods },
   details: { status: 'details', methods, method: card },
@@ -55,4 +55,4 @@ export const states: Readonly<Record<string, CheckoutState>> = {
     failure: { code: 'declined', message: 'The bank said no.' },
     retryable: false,
   },
-};
+} as const satisfies Record<string, CheckoutState>;

@@ -10,5 +10,6 @@ export type WidgetIntent =
   | { readonly type: 'go-back' }
   | { readonly type: 'pay' }
   | { readonly type: 'challenge-finished' }
+  | { readonly type: 'challenge-dismissed' }
   | { readonly type: 'retry' }
   | { readonly type: 'dismiss' };

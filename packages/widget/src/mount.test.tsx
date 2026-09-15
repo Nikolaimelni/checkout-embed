@@ -16,7 +16,7 @@ afterEach(() => {
 
 function mount(
   host: Element,
-  store: TestStore = createTestStore(states['methods'] as never),
+  store: TestStore = createTestStore(states.methods),
 ): { view: WidgetView; store: TestStore; input: WidgetInput } {
   const input: WidgetInput = { store, total, onIntent: vi.fn() };
   let view!: WidgetView;
@@ -58,7 +58,7 @@ describe('mountWidget', () => {
     const { view, store } = mount(host);
 
     act(() => {
-      store.set(states['succeeded'] as never);
+      store.set(states.succeeded);
     });
 
     expect(view.shadowRoot.textContent).toContain('Payment complete');
@@ -68,7 +68,7 @@ describe('mountWidget', () => {
     const host = hostElement();
     const { view: first } = mount(host);
 
-    const { view: second } = mount(host, createTestStore(states['succeeded'] as never));
+    const { view: second } = mount(host, createTestStore(states.succeeded));
 
     expect(second).toBe(first);
     expect(host.shadowRoot?.childElementCount).toBe(2);
@@ -117,7 +117,7 @@ describe('mountWidget', () => {
 
     expect(() =>
       mountWidget(host, {
-        store: createTestStore(states['idle'] as never),
+        store: createTestStore(states.idle),
         total,
         onIntent: vi.fn(),
       }),
@@ -129,7 +129,7 @@ describe('mountWidget', () => {
 
     try {
       mountWidget(host, {
-        store: createTestStore(states['idle'] as never),
+        store: createTestStore(states.idle),
         total,
         onIntent: vi.fn(),
       });

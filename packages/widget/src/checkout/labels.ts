@@ -8,6 +8,7 @@ export type Labels = {
   readonly challengeTitle: string;
   readonly challengeHint: string;
   readonly challengeDone: string;
+  readonly challengeCancel: string;
   readonly polling: string;
   readonly succeeded: string;
   readonly failed: string;
@@ -26,6 +27,7 @@ export const DEFAULT_LABELS: Labels = {
   challengeTitle: 'Your bank needs to confirm this payment',
   challengeHint: 'Finish the check in the window below.',
   challengeDone: 'I have finished',
+  challengeCancel: 'Cancel',
   polling: 'Waiting for confirmation',
   succeeded: 'Payment complete',
   failed: 'The payment did not go through',

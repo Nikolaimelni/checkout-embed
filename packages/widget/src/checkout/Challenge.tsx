@@ -1,4 +1,3 @@
-import { FocusScope } from '@react-aria/focus';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { boolean, literal, object, string } from 'zod';
 import { Button } from './HostElement.js';
@@ -25,6 +24,7 @@ type Props = {
   readonly labels: Labels;
   readonly hostButtonTag?: string | undefined;
   readonly onFinished: () => void;
+  readonly onDismissed: () => void;
 };
 
 export function Challenge({
@@ -33,15 +33,21 @@ export function Challenge({
   labels,
   hostButtonTag,
   onFinished,
+  onDismissed,
 }: Props): ReactNode {
-  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
 
-  // Syncs with the DOM focus ring. React Aria autoFocus walks out from
-  // document.activeElement, which for a shadow root is the host element rather than
-  // anything inside, so opening the dialog leaves focus where it was. Moving it to the
-  // dialog itself also gets its label read out before the iframe takes over.
+  // Syncs with the browser's top layer. A modal dialog is drawn above the whole page, so
+  // a transform or an overflow on one of the host's elements around our container cannot
+  // clip it the way it clips position: fixed. Focus goes to the dialog itself, which gets
+  // its label read out before the iframe takes over.
   useEffect(() => {
-    dialogRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    dialog.showModal();
+    dialog.focus();
+    return () => dialog.close();
   }, []);
 
   // Syncs with the challenge iframe, a document on the provider's origin that posts a
@@ -63,28 +69,30 @@ export function Challenge({
   }, [actionUrl, intentId, onFinished]);
 
   return (
-    <div className="overlay">
-      <FocusScope contain restoreFocus>
-        <div
-          className="dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.challengeTitle}
-          tabIndex={-1}
-          ref={dialogRef}
-        >
-          <div className="challenge">
-            <h2 className="heading">{labels.challengeTitle}</h2>
-            <p className="status">{labels.challengeHint}</p>
-            <iframe className="challenge-frame" src={actionUrl} title={labels.challengeTitle} />
-            <div className="actions">
-              <Button hostTag={hostButtonTag} variant="secondary" onClick={onFinished}>
-                {labels.challengeDone}
-              </Button>
-            </div>
-          </div>
+    <dialog
+      className="dialog"
+      aria-label={labels.challengeTitle}
+      tabIndex={-1}
+      ref={dialogRef}
+      onCancel={(event) => {
+        // Escape would close the dialog behind the machine's back and leave it waiting.
+        event.preventDefault();
+        onDismissed();
+      }}
+    >
+      <div className="challenge">
+        <h2 className="heading">{labels.challengeTitle}</h2>
+        <p className="status">{labels.challengeHint}</p>
+        <iframe className="challenge-frame" src={actionUrl} title={labels.challengeTitle} />
+        <div className="actions">
+          <Button hostTag={hostButtonTag} variant="secondary" onClick={onFinished}>
+            {labels.challengeDone}
+          </Button>
+          <Button hostTag={hostButtonTag} variant="secondary" onClick={onDismissed}>
+            {labels.challengeCancel}
+          </Button>
         </div>
-      </FocusScope>
-    </div>
+      </div>
+    </dialog>
   );
 }

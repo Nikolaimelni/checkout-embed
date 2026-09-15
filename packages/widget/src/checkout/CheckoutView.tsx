@@ -143,6 +143,7 @@ export function CheckoutView({
               labels={labels}
               hostButtonTag={buttonTag}
               onFinished={() => onIntent({ type: 'challenge-finished' })}
+              onDismissed={() => onIntent({ type: 'challenge-dismissed' })}
             />
           </>
         );

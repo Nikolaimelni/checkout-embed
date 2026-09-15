@@ -1,6 +1,6 @@
 import type { Money } from '@checkout-embed/contracts';
 import type { CheckoutState } from '@checkout-embed/core';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CHALLENGE_URL, card, savedCard, states } from '../testing/fixtures.js';
@@ -31,20 +31,20 @@ describe('every screen', () => {
 
 describe('choosing a method', () => {
   it('lists one button per method with its label', () => {
-    show(states['methods'] as CheckoutState);
+    show(states.methods);
 
     expect(screen.getByRole('button', { name: /^Card$/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Visa ending 4242/ })).toBeInTheDocument();
   });
 
   it('shows the last four digits of a saved card', () => {
-    show(states['methods'] as CheckoutState);
+    show(states.methods);
 
     expect(screen.getByText(`•••• ${savedCard.last4}`)).toBeInTheDocument();
   });
 
   it('reports which method was chosen', async () => {
-    const onIntent = show(states['methods'] as CheckoutState);
+    const onIntent = show(states.methods);
 
     await userEvent.click(screen.getByRole('button', { name: /^Card$/ }));
 
@@ -54,7 +54,7 @@ describe('choosing a method', () => {
 
 describe('the details screen', () => {
   it('offers paying and going back', async () => {
-    const onIntent = show(states['details'] as CheckoutState);
+    const onIntent = show(states.details);
 
     await userEvent.click(screen.getByRole('button', { name: 'Pay' }));
     await userEvent.click(screen.getByRole('button', { name: 'Back' }));
@@ -65,31 +65,50 @@ describe('the details screen', () => {
 });
 
 describe('the challenge', () => {
-  it('frames the provider page in a labelled dialog', () => {
-    show(states['requires_action'] as CheckoutState);
+  it('frames the provider page in an open, labelled dialog', () => {
+    show(states.requires_action);
 
-    const dialog = screen.getByRole('dialog');
+    const dialog = screen.getByRole('dialog', { name: /confirm this payment/i });
 
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(dialog).toHaveAttribute('open');
     expect(screen.getByTitle(/confirm this payment/i)).toHaveAttribute('src', CHALLENGE_URL);
   });
 
   it('moves focus into the dialog so its label is read out', () => {
-    show(states['requires_action'] as CheckoutState);
+    show(states.requires_action);
 
     expect(screen.getByRole('dialog')).toHaveFocus();
   });
 
   it('lets someone say they are done when the iframe never tells us', async () => {
-    const onIntent = show(states['requires_action'] as CheckoutState);
+    const onIntent = show(states.requires_action);
 
     await userEvent.click(screen.getByRole('button', { name: /I have finished/ }));
 
     expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-finished' });
   });
 
+  it('lets someone walk away from the check', async () => {
+    const onIntent = show(states.requires_action);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-dismissed' });
+  });
+
+  it('treats Escape as walking away rather than closing the dialog behind the machine', () => {
+    const onIntent = show(states.requires_action);
+    const dialog = screen.getByRole('dialog');
+
+    const cancel = new Event('cancel', { cancelable: true });
+    fireEvent(dialog, cancel);
+
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-dismissed' });
+  });
+
   it('acts on a message from the provider origin', () => {
-    const onIntent = show(states['requires_action'] as CheckoutState);
+    const onIntent = show(states.requires_action);
 
     window.dispatchEvent(
       new MessageEvent('message', {
@@ -119,7 +138,7 @@ describe('the challenge', () => {
     ],
     ['a bare string', new URL(CHALLENGE_URL).origin, 'done'],
   ])('ignores a message from %s', (_label, origin, data) => {
-    const onIntent = show(states['requires_action'] as CheckoutState);
+    const onIntent = show(states.requires_action);
 
     window.dispatchEvent(new MessageEvent('message', { origin, data }));
 
@@ -129,26 +148,26 @@ describe('the challenge', () => {
 
 describe('the end of the payment', () => {
   it('offers a retry when the provider said the failure was not final', () => {
-    show(states['failed'] as CheckoutState);
+    show(states.failed);
 
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
   it('offers no retry when it was', () => {
-    show(states['failedFinal'] as CheckoutState);
+    show(states.failedFinal);
 
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
   });
 
   it('shows what the provider actually said', () => {
-    show(states['failed'] as CheckoutState);
+    show(states.failed);
 
     expect(screen.getByText('The bank said no.')).toBeInTheDocument();
   });
 
   it('closes from the receipt', async () => {
-    const onIntent = show(states['succeeded'] as CheckoutState);
+    const onIntent = show(states.succeeded);
 
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
@@ -168,7 +187,7 @@ describe('what the host pushes in', () => {
   const empty = { balance: null, limits: null, blockingMessage: null } as const;
 
   it('replaces the screen with the message the merchant is blocking on', () => {
-    showWith(states['methods'] as CheckoutState, {
+    showWith(states.methods, {
       ...empty,
       blockingMessage: 'Your account is under review.',
     });
@@ -182,13 +201,13 @@ describe('what the host pushes in', () => {
   });
 
   it('announces the block rather than the screen behind it', () => {
-    showWith(states['methods'] as CheckoutState, { ...empty, blockingMessage: 'Under review.' });
+    showWith(states.methods, { ...empty, blockingMessage: 'Under review.' });
 
     expect(screen.getByRole('status')).toHaveTextContent('Under review.');
   });
 
   it('refuses to pay an amount above the limit the host gave', () => {
-    showWith(states['details'] as CheckoutState, {
+    showWith(states.details, {
       ...empty,
       limits: { minMinor: 100, maxMinor: 500 },
     });
@@ -198,7 +217,7 @@ describe('what the host pushes in', () => {
   });
 
   it('refuses one below it too', () => {
-    showWith(states['details'] as CheckoutState, {
+    showWith(states.details, {
       ...empty,
       limits: { minMinor: 5000, maxMinor: 50_000 },
     });
@@ -207,7 +226,7 @@ describe('what the host pushes in', () => {
   });
 
   it('lets an amount inside the limits through', () => {
-    showWith(states['details'] as CheckoutState, {
+    showWith(states.details, {
       ...empty,
       limits: { minMinor: 100, maxMinor: 100_000 },
     });
@@ -216,7 +235,7 @@ describe('what the host pushes in', () => {
   });
 
   it('does nothing when the host has pushed nothing', () => {
-    showWith(states['details'] as CheckoutState, empty);
+    showWith(states.details, empty);
 
     expect(screen.getByRole('button', { name: 'Pay' })).toBeEnabled();
   });
