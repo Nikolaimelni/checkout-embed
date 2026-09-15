@@ -1,23 +1,7 @@
-import { type PaymentMethod, PaymentMethodSchema } from '@checkout-embed/contracts';
 import { mountWidget, type WidgetIntent } from '@checkout-embed/widget';
 import { useEffect, useRef, useState } from 'react';
 import { createDriver, OUTCOMES, type Outcome } from './driver';
-
-const TOTAL = { amountMinor: 1000, currency: 'EUR' } as const;
-
-const METHODS: readonly PaymentMethod[] = [
-  PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' }),
-  PaymentMethodSchema.parse({ id: 'pm_apple_pay', kind: 'apple_pay', label: 'Apple Pay' }),
-  PaymentMethodSchema.parse({
-    id: 'pm_saved_visa',
-    kind: 'saved_card',
-    label: 'Visa ending 4242',
-    brand: 'visa',
-    last4: '4242',
-  }),
-];
-
-const CHALLENGE_URL = 'http://localhost:4000/3ds/pi_sandbox';
+import { CHALLENGE_URL, METHODS, TOTAL } from './fixtures';
 
 /**
  * Not a strawman. Resets and design systems in the wild really do reach for the universal

@@ -115,6 +115,15 @@ export function createDriver(options: DriverOptions): Driver {
           return;
         }
 
+        case 'challenge-dismissed':
+          if (state.status !== 'requires_action') return;
+          dispatch({
+            type: 'payment/failed',
+            failure: { code: 'action_abandoned', message: 'The bank check was closed.' },
+            retryable: true,
+          });
+          return;
+
         case 'retry':
           dispatch({ type: 'checkout/retried' });
           return;

@@ -57,6 +57,20 @@ describe('createDriver', () => {
     expect(driver.getState().status).toBe('succeeded');
   });
 
+  it('fails as abandoned when the challenge is closed', () => {
+    const driver = driverFor('require_action');
+    driver.open();
+    driver.handle({ type: 'select-method', methodId: card.id });
+    driver.handle({ type: 'pay' });
+
+    driver.handle({ type: 'challenge-dismissed' });
+
+    expect(driver.getState()).toMatchObject({
+      status: 'failed',
+      failure: { code: 'action_abandoned' },
+    });
+  });
+
   it('lands a decline somewhere a retry can start from', () => {
     const driver = driverFor('decline');
     driver.open();
