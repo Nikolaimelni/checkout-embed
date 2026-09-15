@@ -26,5 +26,9 @@ COPY --from=build /repo/apps/mock-psp/dist ./dist
 COPY --from=build /repo/apps/mock-psp/drizzle ./drizzle
 
 USER node
+
+# Matches EXPOSE below and internal_port in fly.toml. Without it the image listens on
+# the schema default of 4000 and only Fly would know better.
+ENV PORT=8080
 EXPOSE 8080
 CMD ["node", "dist/server.js"]

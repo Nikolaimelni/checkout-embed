@@ -14,7 +14,9 @@ export const base: PlaywrightTestConfig = {
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   workers: 1,
-  reporter: process.env['CI'] ? 'github' : 'list',
+  // github writes annotations and nothing else, so the html report goes alongside it:
+  // without a file on disk there is nothing for CI to upload when a run fails.
+  reporter: process.env['CI'] ? [['github'], ['html', { open: 'never' }]] : 'list',
 
   use: {
     trace: 'on-first-retry',

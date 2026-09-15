@@ -61,5 +61,34 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          path: e2e/playwright-report
+          # The report and the traces. Retries are on in CI, so a flake leaves a trace of
+          # its second attempt behind.
+          path: |
+            e2e/playwright-report
+            e2e/test-results
           retention-days: 7
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # The deploy artifact, built and started. Fly should not be the first thing to find
+      # out that the Dockerfile is wrong.
+      - run: docker build -f apps/mock-psp/Dockerfile -t checkout-embed-psp:ci .
+
+      - name: the container comes up and reaches its database
+        run: |
+          docker run -d --name psp -p 8080:8080 \
+            -e WEBHOOK_SECRET=ci-secret-that-is-not-used-for-anything \
+            -e DATABASE_URL=/tmp/psp.db \
+            -e PUBLIC_BASE_URL=http://localhost:8080 \
+            checkout-embed-psp:ci
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/healthz; then exit 0; fi
+            sleep 2
+          done
+
+          docker logs psp
+          exit 1
