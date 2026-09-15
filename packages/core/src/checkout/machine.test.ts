@@ -241,8 +241,8 @@ describe('polling', () => {
     });
   });
 
-  it('leaves room for a payment that takes a couple of minutes', () => {
-    expect(DEFAULT_MAX_POLL_ATTEMPTS).toBeGreaterThanOrEqual(30);
+  it('leaves a minute for a payment to settle at the SDK poll interval', () => {
+    expect(DEFAULT_MAX_POLL_ATTEMPTS * 1.5).toBeGreaterThanOrEqual(60);
   });
 });
 

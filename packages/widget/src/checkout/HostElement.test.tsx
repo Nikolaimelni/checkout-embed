@@ -103,4 +103,19 @@ describe('Button', () => {
 
     expect(onClick).not.toHaveBeenCalled();
   });
+
+  it('does not call back from a disabled host component either', async () => {
+    const tag = uniqueTag();
+    define(tag);
+    const onClick = vi.fn();
+
+    const { container } = render(
+      <Button hostTag={tag} disabled onClick={onClick}>
+        Pay
+      </Button>,
+    );
+    await userEvent.click(container.querySelector(tag) as Element);
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });

@@ -14,6 +14,17 @@ describe('formatMoney', () => {
     expect(formatMoney({ amountMinor: 1000, currency: 'BHD' }, 'en-US')).toContain('1.000');
   });
 
+  it.each([
+    ['HUF', 100_000, '1,000.00'],
+    ['IDR', 1_500_000, '15,000.00'],
+    ['IQD', 5_000, '5.000'],
+  ])(
+    'reads %s in the minor units the provider charges in, not the digits Intl shows',
+    (currency, amountMinor, shown) => {
+      expect(formatMoney({ amountMinor, currency }, 'en-US')).toContain(shown);
+    },
+  );
+
   it('keeps the trailing zeros a price needs', () => {
     expect(formatMoney({ amountMinor: 1050, currency: 'USD' }, 'en-US')).toContain('10.50');
   });

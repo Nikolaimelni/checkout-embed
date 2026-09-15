@@ -30,6 +30,7 @@ export {
   type PaymentMethodId,
   PaymentMethodIdSchema,
 } from './identifiers.js';
+export { describeIssues } from './issues.js';
 export { type Money, MoneySchema } from './money.js';
 export {
   isTerminalIntentStatus,

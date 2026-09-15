@@ -68,9 +68,15 @@ export function Button({
     const Host = tag as unknown as ElementType;
 
     // An absent attribute rather than disabled="false", which a custom element would read
-    // as disabled.
+    // as disabled. The handler goes too: a custom element is not a form control, and the
+    // attribute alone would not stop a click on Pay for an amount outside the limits.
     return (
-      <Host className={className} disabled={disabled || undefined} onClick={onClick}>
+      <Host
+        className={className}
+        disabled={disabled || undefined}
+        aria-disabled={disabled || undefined}
+        onClick={disabled ? undefined : onClick}
+      >
         {children}
       </Host>
     );

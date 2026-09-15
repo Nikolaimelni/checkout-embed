@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { int, iso, literal, object, string } from 'zod';
+import { describeIssues } from './issues.js';
 import { MESSAGE_SOURCE, PROTOCOL_VERSION } from './protocol.js';
 
 export type Envelope<TPayload> = {
@@ -78,13 +79,7 @@ export function readEnvelope<TPayload>(
 
   const parsed = envelopeOf(payloadSchema).safeParse(raw);
   if (!parsed.success) {
-    return {
-      ok: false,
-      reason: 'malformed',
-      issues: parsed.error.issues.map(
-        (issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`,
-      ),
-    };
+    return { ok: false, reason: 'malformed', issues: describeIssues(parsed.error) };
   }
 
   return { ok: true, value: parsed.data };

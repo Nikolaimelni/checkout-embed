@@ -4,6 +4,16 @@ import { CustomElementNameSchema } from './custom-element.js';
 import { MerchantKeySchema } from './identifiers.js';
 import { PaymentMethodSchema } from './payment-method.js';
 
+// Intl.NumberFormat throws on a malformed tag like en_US, and the widget formats the
+// amount in its very first render.
+function isLanguageTag(value: string): boolean {
+  try {
+    return Intl.getCanonicalLocales(value).length === 1;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Everything a merchant can hand us that survives a JSON round trip. The token callback
  * does not, so it is not here: it belongs to the auth adapter, not to the config.
@@ -12,8 +22,9 @@ export const CheckoutConfigSchema = object({
   merchantKey: MerchantKeySchema,
   environment: zEnum(['sandbox', 'live']),
   apiBaseUrl: url(),
-  locale: string().min(2).default('en'),
-  theme: zEnum(['light', 'dark', 'system']).default('system'),
+  locale: string()
+    .refine(isLanguageTag, { error: 'expected a BCP 47 language tag such as en-US' })
+    .default('en'),
   /**
    * Components the host would rather render itself. The widget looks each name up in the
    * custom element registry and falls back to its own component when nothing is there.
@@ -21,6 +32,9 @@ export const CheckoutConfigSchema = object({
   components: object({
     button: CustomElementNameSchema.optional(),
   }).default({}),
+}).refine((config) => config.environment === 'sandbox' || /^https:/i.test(config.apiBaseUrl), {
+  error: 'a live checkout has to reach its provider over https',
+  path: ['apiBaseUrl'],
 });
 
 export type CheckoutConfig = z.infer<typeof CheckoutConfigSchema>;

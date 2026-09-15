@@ -79,11 +79,37 @@ describe('createEventBus', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('keeps a later listener when an old unsubscribe runs twice', () => {
+    const bus = createEventBus();
+    const later = vi.fn();
+
+    const off = bus.on('widget:ready', vi.fn());
+    off();
+    bus.on('widget:ready', later);
+    off();
+    bus.emit({ type: 'widget:ready' });
+
+    expect(later).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a listener added after clear when an older unsubscribe runs', () => {
+    const bus = createEventBus();
+    const later = vi.fn();
+
+    const off = bus.on('widget:ready', vi.fn());
+    bus.clear();
+    bus.on('widget:ready', later);
+    off();
+    bus.emit({ type: 'widget:ready' });
+
+    expect(later).toHaveBeenCalledOnce();
+  });
+
   it('is quiet about an event nobody listens to', () => {
     const { logger, levels } = spyLogger();
     const bus = createEventBus({ logger });
 
-    expect(() => bus.emit({ type: 'widget:resize', height: 420 })).not.toThrow();
+    expect(() => bus.emit({ type: 'widget:ready' })).not.toThrow();
     expect(levels).toEqual([]);
   });
 });

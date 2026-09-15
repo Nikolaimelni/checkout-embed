@@ -2,10 +2,7 @@ import type { PaymentMethod } from '@checkout-embed/contracts';
 import { type Logger, silentLogger } from '../adapters/logger.js';
 import type { CheckoutAction, CheckoutState } from './state.js';
 
-/**
- * Roughly two minutes at a two second interval. Past that the mock PSP has stopped
- * answering and so has any real one.
- */
+/** A minute and a half at the SDK's 1.5 s interval, plus however long the reads take. */
 export const DEFAULT_MAX_POLL_ATTEMPTS = 60;
 
 type Applied = { readonly next: CheckoutState } | { readonly dropped: string };

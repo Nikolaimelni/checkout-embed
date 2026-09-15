@@ -47,13 +47,20 @@ describe('readEnvelope', () => {
   });
 
   it('reports the offending path when the payload is the right version but the wrong shape', () => {
-    const raw = sealEnvelope({ type: 'widget:resize', height: -10 } as const, seal);
+    const raw = sealEnvelope(
+      {
+        type: 'payment:success',
+        intentId: 'pi_1',
+        money: { amountMinor: -10, currency: 'EUR' },
+      } as const,
+      seal,
+    );
 
     const read = readEnvelope(WidgetEventSchema, raw);
 
     expect(read.ok).toBe(false);
     if (!read.ok && read.reason === 'malformed') {
-      expect(read.issues.join(' ')).toContain('payload.height');
+      expect(read.issues.join(' ')).toContain('payload.money.amountMinor');
     }
   });
 

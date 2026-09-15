@@ -52,7 +52,9 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
 
       return () => {
         registered.delete(erased);
-        if (registered.size === 0) listeners.delete(type);
+        // A second call, or one after clear(), holds a set that is no longer in the map,
+        // and deleting by type would drop whoever subscribed since.
+        if (registered.size === 0 && listeners.get(type) === registered) listeners.delete(type);
       };
     },
 
