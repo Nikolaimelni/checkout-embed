@@ -7,20 +7,15 @@ import { useEffect, useState } from 'react';
 
 type Props = {
   readonly amount: Money;
+  readonly apiBaseUrl: string;
 };
-
-const CONFIG = {
-  merchantKey: 'mk_test_acme',
-  environment: 'sandbox',
-  apiBaseUrl: process.env['NEXT_PUBLIC_PSP_URL'] ?? 'http://localhost:4000',
-} as const;
 
 /**
  * The whole point of this app. The widget owns a shadow root and a React root of its own,
  * neither of which Next knows about, so the cleanup below is the only thing standing
  * between a client side navigation and a widget that outlives its page.
  */
-export function Checkout({ amount }: Props) {
+export function Checkout({ amount, apiBaseUrl }: Props) {
   // State rather than a ref: the effect has to run again if React hands it a different
   // node, and a ref would not tell it.
   const [host, setHost] = useState<HTMLDivElement | null>(null);
@@ -30,7 +25,7 @@ export function Checkout({ amount }: Props) {
     if (!host) return;
 
     const checkout = init({
-      config: CONFIG,
+      config: { merchantKey: 'mk_test_acme', environment: 'sandbox', apiBaseUrl },
       auth: { getToken: async () => 'demo-token' },
     });
 
@@ -45,7 +40,7 @@ export function Checkout({ amount }: Props) {
       // Deliberately not terminate(). The instance is shared per merchant key, and this
       // component has no business ending it for anyone else on the page.
     };
-  }, [host, amount, router]);
+  }, [host, amount, apiBaseUrl, router]);
 
   return <div id="checkout" ref={setHost} />;
 }

@@ -14,6 +14,7 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "components/**/*.tsx",
+    "env.ts",
     "next.config.ts"
   ],
   "exclude": ["node_modules", ".next"]

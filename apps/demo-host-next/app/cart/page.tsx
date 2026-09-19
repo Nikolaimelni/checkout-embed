@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Checkout } from '../../components/Checkout';
+import { pspUrl } from '../../env';
 
 const AMOUNT = { amountMinor: 4999, currency: 'EUR' } as const;
 
@@ -21,7 +22,7 @@ export default function Cart() {
         <strong>Total: &euro;49.99</strong>
       </p>
 
-      <Checkout amount={AMOUNT} />
+      <Checkout amount={AMOUNT} apiBaseUrl={pspUrl()} />
 
       <p style={{ marginTop: 32 }}>
         <Link href="/success" id="leave-without-paying">
