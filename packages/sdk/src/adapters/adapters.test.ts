@@ -1,7 +1,6 @@
 import { isCheckoutError } from '@checkout-embed/core';
 import { describe, expect, it, vi } from 'vitest';
 import { createFetchHttp } from './http-fetch.js';
-import { createBrowserStorage } from './storage-local.js';
 
 const auth = { getToken: async () => 'tok_live' };
 
@@ -105,6 +104,42 @@ describe('createFetchHttp', () => {
     ).rejects.toSatisfy((error: unknown) => isCheckoutError(error) && error.code === 'timeout');
   });
 
+  it('turns a failing token callback into a retryable error and leaves no timer behind', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const failing = createFetchHttp({
+        baseUrl: 'https://api.test',
+        auth: {
+          getToken: async () => {
+            throw new Error('token endpoint is down');
+          },
+        },
+        fetchImpl: vi.fn() as unknown as typeof fetch,
+      });
+
+      await expect(failing.send({ method: 'GET', path: '/v1/config' })).rejects.toSatisfy(
+        (error: unknown) => isCheckoutError(error) && error.code === 'network' && error.retryable,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives up on a token callback that never answers', async () => {
+    const hanging = createFetchHttp({
+      baseUrl: 'https://api.test',
+      auth: { getToken: () => new Promise<string>(() => {}) },
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+      timeoutMs: 10,
+    });
+
+    await expect(hanging.send({ method: 'GET', path: '/v1/config' })).rejects.toSatisfy(
+      (error: unknown) => isCheckoutError(error) && error.code === 'timeout',
+    );
+  });
+
   it('keeps the status when a gateway answers with something that is not json', async () => {
     const fetchImpl = async () =>
       ({ status: 502, text: async () => '<html>bad gateway' }) as Response;
@@ -121,38 +156,5 @@ describe('createFetchHttp', () => {
       status: 204,
       body: null,
     });
-  });
-});
-
-describe('createBrowserStorage', () => {
-  it('namespaces what it writes so a merchant s own keys stay theirs', async () => {
-    const storage = createBrowserStorage({ view: window, namespace: 'ce' });
-
-    await storage.write('session', 'abc');
-
-    expect(window.localStorage.getItem('ce:session')).toBe('abc');
-    expect(await storage.read('session')).toBe('abc');
-
-    await storage.remove('session');
-    expect(await storage.read('session')).toBeNull();
-  });
-
-  it('keeps working in memory when storage is blocked', async () => {
-    const warn = vi.fn();
-    const blocked = {
-      get localStorage(): Storage {
-        throw new DOMException('The operation is insecure.', 'SecurityError');
-      },
-    } as Window;
-
-    const storage = createBrowserStorage({ view: blocked, warn });
-    await storage.write('session', 'abc');
-
-    expect(await storage.read('session')).toBe('abc');
-    expect(warn).toHaveBeenCalledOnce();
-  });
-
-  it('reports nothing for a key it never wrote', async () => {
-    expect(await createBrowserStorage({ view: window }).read('absent')).toBeNull();
   });
 });

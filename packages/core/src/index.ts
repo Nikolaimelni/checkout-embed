@@ -10,7 +10,6 @@ export {
 } from './adapters/events.js';
 export type { AbortLike, HttpAdapter, HttpRequest, HttpResponse } from './adapters/http.js';
 export { type Logger, type LogLevel, silentLogger } from './adapters/logger.js';
-export type { StorageAdapter } from './adapters/storage.js';
 export {
   type CheckoutReducer,
   type CheckoutReducerOptions,

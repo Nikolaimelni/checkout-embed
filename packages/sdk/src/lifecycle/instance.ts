@@ -2,6 +2,7 @@ import {
   type CheckoutConfig,
   type CheckoutConfigInput,
   CheckoutConfigSchema,
+  describeIssues,
   HostMessageSchema,
   type MerchantKey,
   type Money,
@@ -27,7 +28,7 @@ import {
 } from '@checkout-embed/widget';
 import { createFetchHttp } from '../adapters/http-fetch.js';
 import { createCheckoutApi } from '../checkout/client.js';
-import { createCheckoutController } from '../checkout/controller.js';
+import { type CheckoutController, createCheckoutController } from '../checkout/controller.js';
 
 export type CheckoutOptions = {
   readonly config: CheckoutConfigInput;
@@ -65,9 +66,14 @@ export type CheckoutInstance = {
 
 type Mounted = {
   readonly view: WidgetView;
+  readonly controller: CheckoutController;
   input: WidgetInput;
-  dispose(): void;
 };
+
+function tearDown(mounted: Mounted): void {
+  mounted.controller.dispose();
+  mounted.view.unmount();
+}
 
 const EMPTY_HOST: HostState = { balance: null, limits: null, blockingMessage: null };
 
@@ -93,9 +99,7 @@ function parseConfig(input: CheckoutConfigInput): CheckoutConfig {
   const parsed = CheckoutConfigSchema.safeParse(input);
 
   if (!parsed.success) {
-    const detail = parsed.error.issues
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-      .join('; ');
+    const detail = describeIssues(parsed.error).join('; ');
     throw new CheckoutError('invalid_config', `The checkout config is not usable: ${detail}`);
   }
 
@@ -105,7 +109,16 @@ function parseConfig(input: CheckoutConfigInput): CheckoutConfig {
 export function init(options: CheckoutOptions): CheckoutInstance {
   const config = parseConfig(options.config);
   const existing = instances.get(config.merchantKey);
-  if (existing) return existing;
+
+  if (existing) {
+    if (JSON.stringify(existing.config) !== JSON.stringify(config)) {
+      options.logger?.log('warn', 'checkout: init() returned the instance that already exists', {
+        merchantKey: config.merchantKey,
+        why: 'one instance per merchant key keeps its first config until terminate()',
+      });
+    }
+    return existing;
+  }
 
   const view = options.view ?? window;
   const logger = options.logger ?? silentLogger;
@@ -118,7 +131,7 @@ export function init(options: CheckoutOptions): CheckoutInstance {
     }),
   );
 
-  const mounts = new Set<Mounted>();
+  const mounts = new Map<Element, Mounted>();
   let host: HostState = EMPTY_HOST;
   let terminated = false;
 
@@ -155,23 +168,22 @@ export function init(options: CheckoutOptions): CheckoutInstance {
         ...(mountOptions.labels ? { labels: mountOptions.labels } : {}),
       };
 
-      const widget = mountWidget(element, input);
-      const mounted: Mounted = {
-        view: widget,
-        input,
-        dispose() {
-          controller.dispose();
-          widget.unmount();
-        },
-      };
+      // A second mount into the same element is the same widget with a new controller:
+      // mountWidget renders into the root it already has, and the old controller is stopped
+      // here rather than left loading and polling behind a view that no longer reads it.
+      const previous = mounts.get(element);
+      const mounted: Mounted = { view: mountWidget(element, input), controller, input };
+      previous?.controller.dispose();
 
-      mounts.add(mounted);
+      mounts.set(element, mounted);
       controller.start();
+      events.emit({ type: 'widget:ready' });
 
       return {
         unmount() {
-          if (!mounts.delete(mounted)) return;
-          mounted.dispose();
+          if (mounts.get(element) !== mounted) return;
+          mounts.delete(element);
+          tearDown(mounted);
         },
       };
     },
@@ -179,10 +191,10 @@ export function init(options: CheckoutOptions): CheckoutInstance {
     update(patch) {
       refuseIfTerminated();
 
-      // Validated on the way in even though it never leaves the process. This is the
-      // merchant's data crossing into ours, and a limit that arrived as a string would
-      // otherwise disable the pay button for reasons nobody could explain.
-      const parsed = HostMessageSchema.safeParse({ type: 'host/update', ...patch });
+      // A patch: whatever it leaves out keeps its current value. Validated on the way in
+      // even though it never leaves the process, because a limit that arrived as a string
+      // would disable the pay button for reasons nobody could explain.
+      const parsed = HostMessageSchema.safeParse({ type: 'host/update', ...host, ...patch });
 
       if (!parsed.success || parsed.data.type !== 'host/update') {
         throw new CheckoutError(
@@ -195,7 +207,7 @@ export function init(options: CheckoutOptions): CheckoutInstance {
       const { type: _type, ...next } = parsed.data;
       host = next;
 
-      for (const mounted of mounts) {
+      for (const mounted of mounts.values()) {
         mounted.input = { ...mounted.input, host };
         mounted.view.update(mounted.input);
       }
@@ -209,7 +221,7 @@ export function init(options: CheckoutOptions): CheckoutInstance {
       if (terminated) return;
       terminated = true;
 
-      for (const mounted of mounts) mounted.dispose();
+      for (const mounted of mounts.values()) tearDown(mounted);
       mounts.clear();
       events.clear();
       instances.delete(config.merchantKey);

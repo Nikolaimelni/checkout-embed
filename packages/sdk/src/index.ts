@@ -1,7 +1,5 @@
 export type { FetchHttpOptions } from './adapters/http-fetch.js';
 export { createFetchHttp, DEFAULT_REQUEST_TIMEOUT_MS } from './adapters/http-fetch.js';
-export type { BrowserStorageOptions } from './adapters/storage-local.js';
-export { createBrowserStorage } from './adapters/storage-local.js';
 export type { CheckoutApi, CreateIntentInput } from './checkout/client.js';
 export { createCheckoutApi } from './checkout/client.js';
 export type { CheckoutController, ControllerOptions } from './checkout/controller.js';

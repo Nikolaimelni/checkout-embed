@@ -44,6 +44,20 @@ export type CheckoutController = WidgetStore & {
 };
 
 /**
+ * One attempt to pay. The key and the intent outlive a failure that came without an
+ * answer, so a retry can ask the provider what became of the payment instead of making a
+ * second one.
+ */
+type Attempt = {
+  readonly key: string;
+  readonly methodId: PaymentMethodId;
+  readonly abort: AbortController;
+  intentId: PaymentIntentId | null;
+  /** A request of this attempt is on the wire, and a second click on Pay waits for it. */
+  busy: boolean;
+};
+
+/**
  * The other half of the widget. The widget knows what somebody clicked; this knows what
  * that costs in HTTP calls, and the reducer in core knows which screen the answer leads
  * to. None of the three knows the other two's business.
@@ -54,20 +68,17 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
   const reduce = createCheckoutReducer({ logger });
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const newIdempotencyKey = options.newIdempotencyKey ?? (() => crypto.randomUUID());
+  // why: browsers hand back a number and Node a Timeout object; only clearTimeout reads it.
   const setTimer = options.setTimer ?? ((run, ms) => setTimeout(run, ms) as unknown as number);
   const clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle));
 
   const listeners = new Set<() => void>();
+  const lifetime = new AbortController();
 
   let state: CheckoutState = INITIAL_STATE;
   let disposed = false;
   let pollHandle: number | null = null;
-  /**
-   * Held for the length of one attempt to pay. A retry after a dropped connection replays
-   * the same key and gets the same intent back rather than charging twice; giving up and
-   * starting over gets a new one.
-   */
-  let attemptKey: string | null = null;
+  let attempt: Attempt | null = null;
 
   function announce(previous: CheckoutState, next: CheckoutState): void {
     if (next.status === 'details' && previous.status !== 'details') {
@@ -87,11 +98,12 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     }
   }
 
-  function dispatch(action: CheckoutAction): void {
-    if (disposed) return;
+  /** False when the machine refused the action, which tells an async flow to stop. */
+  function dispatch(action: CheckoutAction): boolean {
+    if (disposed) return false;
 
     const next = reduce(state, action);
-    if (next === state) return;
+    if (next === state) return false;
 
     const previous = state;
     state = next;
@@ -101,6 +113,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     // there. A payment that times out during polling fails inside the reducer, and this is
     // what makes the merchant hear about that one too.
     announce(previous, next);
+    return true;
   }
 
   function fail(cause: unknown): void {
@@ -112,10 +125,35 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     });
   }
 
-  function run(work: () => Promise<void>): void {
+  function run(work: () => Promise<void>, owner: Attempt | null = null): void {
     void work().catch((cause: unknown) => {
-      if (!disposed) fail(cause);
+      // An attempt we aborted ourselves has nothing to report: the screen has moved on.
+      if (disposed || owner?.abort.signal.aborted) return;
+      fail(cause);
     });
+  }
+
+  /**
+   * The same key while the customer stays on the same method, so a replay gets back the
+   * intent the provider already has. Another method is another request body, which the
+   * provider refuses under the old key, so it starts a new attempt.
+   */
+  function attemptFor(methodId: PaymentMethodId): Attempt {
+    const kept = attempt?.methodId === methodId ? attempt : null;
+    attempt = {
+      key: kept?.key ?? newIdempotencyKey(),
+      methodId,
+      abort: new AbortController(),
+      intentId: kept?.intentId ?? null,
+      busy: false,
+    };
+    return attempt;
+  }
+
+  function abandonRequests(): void {
+    if (attempt === null) return;
+    attempt.abort.abort();
+    attempt.busy = false;
   }
 
   function stopPolling(): void {
@@ -124,26 +162,42 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     pollHandle = null;
   }
 
+  function settle(): void {
+    attempt = null;
+    stopPolling();
+  }
+
+  function loadMethods(): void {
+    run(async () => {
+      const config = await api.loadConfig(merchantKey, lifetime.signal);
+      if (!dispatch({ type: 'methods/loaded', methods: config.methods })) return;
+
+      if (options.preselectedMethodId !== undefined) {
+        dispatch({ type: 'method/selected', methodId: options.preselectedMethodId });
+      }
+    });
+  }
+
   function startPolling(id: PaymentIntentId): void {
     stopPolling();
 
     const tick = (): void => {
       pollHandle = null;
       run(async () => {
-        const intent = await api.readIntent(id);
+        const intent = await api.readIntent(id, lifetime.signal);
         if (isTerminalIntentStatus(intent.status)) {
           apply(intent);
           return;
         }
 
-        dispatch({ type: 'poll/tick', intent });
         // The reducer gives up on its own once the budget is spent, which lands the
         // machine somewhere other than polling and ends this loop.
-        if (state.status === 'polling') schedule();
+        if (dispatch({ type: 'poll/tick', intent }) && state.status === 'polling') schedule();
       });
     };
 
     const schedule = (): void => {
+      if (disposed) return;
       pollHandle = setTimer(tick, pollIntervalMs);
     };
 
@@ -167,20 +221,17 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
       }
 
       case 'processing':
-        dispatch({ type: 'poll/started' });
-        startPolling(intent.id);
+        if (dispatch({ type: 'poll/started' })) startPolling(intent.id);
         return;
 
       case 'succeeded':
-        attemptKey = null;
-        stopPolling();
+        settle();
         dispatch({ type: 'payment/succeeded', intent });
         return;
 
       case 'failed':
       case 'canceled':
-        attemptKey = null;
-        stopPolling();
+        settle();
         dispatch({
           type: 'payment/failed',
           failure: {
@@ -200,6 +251,71 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     }
   }
 
+  function pay(): void {
+    if (state.status !== 'details' || attempt?.busy) return;
+
+    const method = state.method;
+    const current = attemptFor(method.id);
+    current.busy = true;
+
+    run(async () => {
+      try {
+        const created = await api.createIntent(
+          { merchantKey, money: total, methodId: method.id },
+          current.key,
+          current.abort.signal,
+        );
+        if (current.abort.signal.aborted) return;
+        current.intentId = created.id;
+
+        // False when Back, a reset or a teardown got here first. Nothing is confirmed yet,
+        // so stopping leaves an intent that nobody will ever charge.
+        if (!dispatch({ type: 'intent/created', intent: created })) return;
+
+        const confirmed = await api.confirmIntent(created.id, method.id, current.abort.signal);
+        if (!current.abort.signal.aborted) apply(confirmed);
+      } finally {
+        current.busy = false;
+      }
+    }, current);
+  }
+
+  function retry(): void {
+    const pending = attempt;
+    abandonRequests();
+    if (!dispatch({ type: 'checkout/retried' })) return;
+
+    const intentId = pending?.intentId ?? null;
+    if (pending === null || intentId === null || !reopen(pending.methodId)) {
+      // The list may be stale, or empty because loading it is what failed. A kept attempt
+      // without an intent still carries its key, so the next Pay replays it.
+      loadMethods();
+      return;
+    }
+
+    // The confirm may have gone through even though its answer never arrived, so the
+    // provider is asked what became of the intent before anything can be charged again.
+    const resumed = attemptFor(pending.methodId);
+    resumed.busy = true;
+
+    run(async () => {
+      try {
+        const intent = await api.readIntent(intentId, resumed.abort.signal);
+        if (resumed.abort.signal.aborted) return;
+
+        // Never confirmed: the details screen is up already, and Pay replays the same key.
+        if (intent.status === 'requires_confirmation') return;
+        if (dispatch({ type: 'intent/created', intent })) apply(intent);
+      } finally {
+        resumed.busy = false;
+      }
+    }, resumed);
+  }
+
+  function reopen(methodId: PaymentMethodId): boolean {
+    return dispatch({ type: 'method/selected', methodId });
+  }
+
   return {
     getState: () => state,
 
@@ -210,16 +326,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
       };
     },
 
-    start() {
-      run(async () => {
-        const config = await api.loadConfig(merchantKey);
-        dispatch({ type: 'methods/loaded', methods: config.methods });
-
-        if (options.preselectedMethodId !== undefined) {
-          dispatch({ type: 'method/selected', methodId: options.preselectedMethodId });
-        }
-      });
-    },
+    start: loadMethods,
 
     handle(intent) {
       switch (intent.type) {
@@ -228,50 +335,50 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           return;
 
         case 'go-back':
+          abandonRequests();
           dispatch({ type: 'details/dismissed' });
           return;
 
-        case 'pay': {
-          if (state.status !== 'details') return;
-          const method = state.method;
-          attemptKey = attemptKey ?? newIdempotencyKey();
-
-          run(async () => {
-            const created = await api.createIntent(
-              { merchantKey, money: total, methodId: method.id },
-              attemptKey as string,
-            );
-            dispatch({ type: 'intent/created', intent: created });
-            apply(await api.confirmIntent(created.id, method.id));
-          });
+        case 'pay':
+          pay();
           return;
-        }
 
         case 'challenge-finished': {
           if (state.status !== 'requires_action') return;
           const id = state.intent.id;
-          dispatch({ type: 'poll/started' });
-          startPolling(id);
+          if (dispatch({ type: 'poll/started' })) startPolling(id);
           return;
         }
 
+        case 'challenge-dismissed':
+          if (state.status !== 'requires_action') return;
+          // The intent stays open at the provider and the attempt keeps it, so Try again
+          // reads it back and reopens the same challenge instead of paying twice.
+          dispatch({
+            type: 'payment/failed',
+            failure: {
+              code: 'action_abandoned',
+              message: 'The bank check was closed before it finished.',
+            },
+            retryable: true,
+          });
+          return;
+
         case 'retry':
-          attemptKey = null;
-          dispatch({ type: 'checkout/retried' });
-          // The list may be stale, or empty because loading it is what failed.
-          this.start();
+          retry();
           return;
 
         case 'dismiss':
-          attemptKey = null;
-          stopPolling();
-          dispatch({ type: 'checkout/reset' });
-          this.start();
+          abandonRequests();
+          settle();
+          if (dispatch({ type: 'checkout/reset' })) loadMethods();
       }
     },
 
     dispose() {
       disposed = true;
+      abandonRequests();
+      lifetime.abort();
       stopPolling();
       listeners.clear();
     },

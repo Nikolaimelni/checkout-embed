@@ -79,7 +79,9 @@ export function readConfig(script: HTMLScriptElement, pageOrigin: string): Loade
     staticBundleUrl: attribute(script, 'data-bundle'),
     globalName: attribute(script, 'data-global') ?? DEFAULT_GLOBAL_NAME,
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_RESOLVE_TIMEOUT_MS,
-    nonce: attribute(script, 'nonce') ?? script.nonce ?? null,
+    // Browsers blank the attribute once the tag is parsed and keep the value only on the
+    // property, which reads as an empty string when there was no nonce at all.
+    nonce: attribute(script, 'nonce') ?? (script.nonce || null),
   };
 }
 

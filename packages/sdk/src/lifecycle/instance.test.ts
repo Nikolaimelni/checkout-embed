@@ -1,3 +1,4 @@
+import { PaymentMethodIdSchema } from '@checkout-embed/contracts';
 import { isCheckoutError } from '@checkout-embed/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakePsp } from '../testing/fake-psp.js';
@@ -11,6 +12,7 @@ const config = {
 
 const auth = { getToken: async () => 'tok_live' };
 const amount = { amountMinor: 1000, currency: 'EUR' } as const;
+const card = PaymentMethodIdSchema.parse('pm_card');
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -59,7 +61,21 @@ describe('init', () => {
   });
 
   it('fills in the parts of the config the merchant left out', () => {
-    expect(instanceWith().config).toMatchObject({ locale: 'en', theme: 'system' });
+    expect(instanceWith().config).toMatchObject({ locale: 'en', components: {} });
+  });
+
+  it('says so, through the logger it was given, when a second init asks for another config', () => {
+    const first = instanceWith();
+    const log = vi.fn();
+
+    const second = init({ config: { ...config, locale: 'de' }, auth, logger: { log } });
+
+    expect(second).toBe(first);
+    expect(second.config.locale).toBe('en');
+    expect(log).toHaveBeenCalledWith('warn', expect.stringContaining('already exists'), {
+      merchantKey: 'mk_test_acme',
+      why: expect.any(String),
+    });
   });
 });
 
@@ -92,7 +108,7 @@ describe('mount', () => {
     const instance = instanceWith();
     instance.on('payment:success', succeeded);
 
-    instance.mount(element, { amount, preselectedMethodId: FAKE_CARD });
+    instance.mount(element, { amount, preselectedMethodId: card });
     await settled();
 
     const pay = [...(element.shadowRoot?.querySelectorAll('button') ?? [])].find(
@@ -143,6 +159,31 @@ describe('mount', () => {
 
     expect(() => handle.unmount()).not.toThrow();
   });
+
+  it('tells the host the widget is on the page', () => {
+    const ready = vi.fn();
+    const instance = instanceWith();
+    instance.on('widget:ready', ready);
+
+    instance.mount(host(), { amount });
+
+    expect(ready).toHaveBeenCalledWith({ type: 'widget:ready' });
+  });
+
+  it('keeps one widget when the same element is mounted twice', async () => {
+    const element = host();
+    const instance = instanceWith();
+
+    const first = instance.mount(element, { amount });
+    const second = instance.mount(element, { amount });
+    await settled();
+
+    first.unmount();
+    expect(element.shadowRoot?.textContent).toContain('Choose how to pay');
+
+    second.unmount();
+    expect(element.shadowRoot?.textContent).toBe('');
+  });
 });
 
 describe('update', () => {
@@ -172,6 +213,32 @@ describe('update', () => {
       expect(first.shadowRoot?.textContent).toContain('Closed for maintenance.');
       expect(second.shadowRoot?.textContent).toContain('Closed for maintenance.');
     });
+  });
+
+  it('keeps what a later patch leaves out', async () => {
+    const element = host();
+    const instance = instanceWith();
+    instance.mount(element, { amount });
+    await settled();
+
+    instance.update({ blockingMessage: 'Closed for stocktaking.' });
+    instance.update({ limits: { minMinor: 0, maxMinor: 100_000 } });
+    await settled();
+
+    expect(element.shadowRoot?.textContent).toContain('Closed for stocktaking.');
+  });
+
+  it('clears a field the patch sets to null', async () => {
+    const element = host();
+    const instance = instanceWith();
+    instance.mount(element, { amount });
+    await settled();
+
+    instance.update({ blockingMessage: 'Closed.' });
+    instance.update({ blockingMessage: null });
+    await settled();
+
+    expect(element.shadowRoot?.textContent).toContain('Choose how to pay');
   });
 
   it('applies to a widget mounted after the update', async () => {
@@ -225,5 +292,3 @@ describe('terminate', () => {
     expect(() => instance.terminate()).not.toThrow();
   });
 });
-
-const FAKE_CARD = 'pm_card' as never;

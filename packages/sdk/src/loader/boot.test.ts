@@ -83,6 +83,20 @@ describe('readConfig', () => {
 
     expect(readConfig(script, 'https://shop.test')?.timeoutMs).toBe(DEFAULT_RESOLVE_TIMEOUT_MS);
   });
+
+  it('finds a nonce the browser has already moved off the attribute', () => {
+    const script = tag({ 'data-merchant-key': 'mk_test' });
+    Object.defineProperty(script, 'nonce', { value: 'r4nd0m' });
+
+    expect(readConfig(script, 'https://shop.test')?.nonce).toBe('r4nd0m');
+  });
+
+  it('reads no nonce off a tag that has none, where the property is an empty string', () => {
+    const script = tag({ 'data-merchant-key': 'mk_test' });
+    Object.defineProperty(script, 'nonce', { value: '' });
+
+    expect(readConfig(script, 'https://shop.test')?.nonce).toBeNull();
+  });
 });
 
 describe('installQueue', () => {

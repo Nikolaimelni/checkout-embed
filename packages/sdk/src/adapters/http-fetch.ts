@@ -5,6 +5,7 @@ import {
   type HttpAdapter,
   type HttpRequest,
   type HttpResponse,
+  isCheckoutError,
 } from '@checkout-embed/core';
 
 export type FetchHttpOptions = {
@@ -33,6 +34,12 @@ function linkAbort(controller: AbortController, signal: AbortLike | undefined): 
   return () => signal.removeEventListener('abort', forward);
 }
 
+function rejectOnAbort(signal: AbortSignal): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+  });
+}
+
 async function readBody(response: Response): Promise<unknown> {
   const text = await response.text();
   if (text.length === 0) return null;
@@ -40,8 +47,8 @@ async function readBody(response: Response): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    // A gateway between us and the provider answering with HTML is a normal Tuesday, and
-    // the status code is still worth reporting.
+    // A gateway in front of the provider can answer with an HTML error page, and the
+    // status code is still worth passing on.
     return { raw: text };
   }
 }
@@ -51,23 +58,45 @@ export function createFetchHttp(options: FetchHttpOptions): HttpAdapter {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const base = options.baseUrl.replace(/\/$/, '');
 
+  async function requestToken(forceRefresh: boolean): Promise<string> {
+    try {
+      return await options.auth.getToken(forceRefresh ? { forceRefresh } : undefined);
+    } catch (cause) {
+      throw new CheckoutError('network', 'Could not get a checkout token from the shop.', {
+        cause,
+        retryable: true,
+      });
+    }
+  }
+
   async function send(request: HttpRequest, forceRefresh: boolean): Promise<HttpResponse> {
     const controller = new AbortController();
     const unlink = linkAbort(controller, request.signal);
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-    const headers: Record<string, string> = {
-      accept: 'application/json',
-      authorization: `Bearer ${await options.auth.getToken(forceRefresh ? { forceRefresh } : undefined)}`,
-      ...request.headers,
-    };
-
-    if (request.body !== undefined) headers['content-type'] = 'application/json';
-    if (request.idempotencyKey !== undefined) {
-      headers['idempotency-key'] = request.idempotencyKey;
-    }
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
 
     try {
+      // The token counts against the same timeout: a callback that never settles would
+      // otherwise hang the payment with nothing on screen to say so.
+      const token = await Promise.race([
+        requestToken(forceRefresh),
+        rejectOnAbort(controller.signal),
+      ]);
+
+      const headers: Record<string, string> = {
+        accept: 'application/json',
+        authorization: `Bearer ${token}`,
+        ...request.headers,
+      };
+
+      if (request.body !== undefined) headers['content-type'] = 'application/json';
+      if (request.idempotencyKey !== undefined) {
+        headers['idempotency-key'] = request.idempotencyKey;
+      }
+
       const response = await fetchImpl(`${base}${request.path}`, {
         method: request.method,
         headers,
@@ -77,7 +106,9 @@ export function createFetchHttp(options: FetchHttpOptions): HttpAdapter {
 
       return { status: response.status, body: await readBody(response) };
     } catch (cause) {
-      if (controller.signal.aborted) {
+      if (isCheckoutError(cause)) throw cause;
+
+      if (timedOut) {
         throw new CheckoutError('timeout', 'The payment provider did not answer in time.', {
           cause,
           retryable: true,

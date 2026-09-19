@@ -8,14 +8,31 @@ import {
   type RemoteWidgetConfig,
   RemoteWidgetConfigSchema,
 } from '@checkout-embed/contracts';
-import { CheckoutError, type HttpAdapter, type HttpResponse } from '@checkout-embed/core';
+import {
+  type AbortLike,
+  CheckoutError,
+  type HttpAdapter,
+  type HttpResponse,
+} from '@checkout-embed/core';
 import type { z } from 'zod';
 
+/**
+ * Every call takes the signal that ends it. A customer pressing Back, or a widget torn down
+ * mid-payment, must not leave a request behind that goes on to confirm a charge.
+ */
 export type CheckoutApi = {
-  loadConfig(merchantKey: MerchantKey): Promise<RemoteWidgetConfig>;
-  createIntent(input: CreateIntentInput, idempotencyKey: string): Promise<PaymentIntent>;
-  confirmIntent(id: PaymentIntentId, methodId: PaymentMethodId): Promise<PaymentIntent>;
-  readIntent(id: PaymentIntentId): Promise<PaymentIntent>;
+  loadConfig(merchantKey: MerchantKey, signal?: AbortLike): Promise<RemoteWidgetConfig>;
+  createIntent(
+    input: CreateIntentInput,
+    idempotencyKey: string,
+    signal?: AbortLike,
+  ): Promise<PaymentIntent>;
+  confirmIntent(
+    id: PaymentIntentId,
+    methodId: PaymentMethodId,
+    signal?: AbortLike,
+  ): Promise<PaymentIntent>;
+  readIntent(id: PaymentIntentId, signal?: AbortLike): Promise<PaymentIntent>;
 };
 
 export type CreateIntentInput = {
@@ -44,7 +61,8 @@ function raise(response: HttpResponse): never {
     throw new CheckoutError('invalid_config', message);
   }
 
-  if (response.status >= 500) {
+  // Too many requests is the provider asking us to slow down, not an answer about the payment.
+  if (response.status === 429 || response.status >= 500) {
     throw new CheckoutError('network', message, { retryable: true });
   }
 
@@ -67,46 +85,55 @@ function parse<T>(schema: z.ZodType<T>, response: HttpResponse): T {
   return parsed.data;
 }
 
+const withSignal = (signal: AbortLike | undefined) => (signal ? { signal } : {});
+
 export function createCheckoutApi(http: HttpAdapter): CheckoutApi {
   const ok = (response: HttpResponse): HttpResponse =>
     response.status >= 200 && response.status < 300 ? response : raise(response);
 
   return {
-    async loadConfig(merchantKey) {
+    async loadConfig(merchantKey, signal) {
       const response = ok(
-        await http.send({ method: 'GET', path: `/v1/config/${encodeURIComponent(merchantKey)}` }),
+        await http.send({
+          method: 'GET',
+          path: `/v1/config/${encodeURIComponent(merchantKey)}`,
+          ...withSignal(signal),
+        }),
       );
       return parse(RemoteWidgetConfigSchema, response);
     },
 
-    async createIntent(input, idempotencyKey) {
+    async createIntent(input, idempotencyKey, signal) {
       const response = ok(
         await http.send({
           method: 'POST',
           path: '/v1/payment-intents',
           body: input,
           idempotencyKey,
+          ...withSignal(signal),
         }),
       );
       return parse(PaymentIntentSchema, response);
     },
 
-    async confirmIntent(id, methodId) {
+    async confirmIntent(id, methodId, signal) {
       const response = ok(
         await http.send({
           method: 'POST',
           path: `/v1/payment-intents/${encodeURIComponent(id)}/confirm`,
           body: { methodId },
+          ...withSignal(signal),
         }),
       );
       return parse(PaymentIntentSchema, response);
     },
 
-    async readIntent(id) {
+    async readIntent(id, signal) {
       const response = ok(
         await http.send({
           method: 'GET',
           path: `/v1/payment-intents/${encodeURIComponent(id)}`,
+          ...withSignal(signal),
         }),
       );
       return parse(PaymentIntentSchema, response);

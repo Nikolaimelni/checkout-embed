@@ -9,7 +9,7 @@ import {
 import { CheckoutError, createEventBus, type EventBus } from '@checkout-embed/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CheckoutApi } from './client.js';
-import { createCheckoutController } from './controller.js';
+import { type ControllerOptions, createCheckoutController } from './controller.js';
 
 const merchantKey = MerchantKeySchema.parse('mk_test_acme');
 const card = PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' });
@@ -30,7 +30,15 @@ function intent(overrides: Partial<Record<string, unknown>> = {}): PaymentIntent
 
 type Timer = { run: () => void; ms: number };
 
-function harness(api: Partial<CheckoutApi>) {
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+function harness(api: Partial<CheckoutApi>, overrides: Partial<ControllerOptions> = {}) {
   const timers: Timer[] = [];
   const seen: WidgetEvent[] = [];
   const events: EventBus = createEventBus();
@@ -58,6 +66,7 @@ function harness(api: Partial<CheckoutApi>) {
     newIdempotencyKey: () => 'key_fixed',
     setTimer: (run, ms) => timers.push({ run, ms }),
     clearTimer: () => {},
+    ...overrides,
   });
 
   /** Fires every timer the controller has queued, in order. */
@@ -86,25 +95,7 @@ describe('start', () => {
   });
 
   it('walks straight to the details screen when the host preselected a method', async () => {
-    const timers: Timer[] = [];
-    const controller = createCheckoutController({
-      api: {
-        loadConfig: async () => ({
-          bundleUrl: 'https://cdn.test/c.js',
-          protocolVersion: 1,
-          methods: [...methods],
-        }),
-        createIntent: async () => intent(),
-        confirmIntent: async () => intent({ status: 'succeeded' }),
-        readIntent: async () => intent({ status: 'succeeded' }),
-      },
-      merchantKey,
-      total,
-      events: createEventBus(),
-      preselectedMethodId: card.id,
-      setTimer: (run, ms) => timers.push({ run, ms }),
-      clearTimer: () => {},
-    });
+    const { controller } = harness({}, { preselectedMethodId: card.id });
 
     controller.start();
     await settled();
@@ -164,6 +155,7 @@ describe('paying', () => {
     expect(createIntent).toHaveBeenCalledWith(
       { merchantKey, money: total, methodId: card.id },
       'key_fixed',
+      expect.objectContaining({ aborted: false }),
     );
     expect(controller.getState().status).toBe('succeeded');
     expect(seen).toContainEqual({ type: 'payment:success', intentId: 'pi_1', money: total });
@@ -243,18 +235,25 @@ describe('paying', () => {
     expect(seen.some((event) => event.type === 'payment:error')).toBe(true);
   });
 
-  it('keeps the same key across a retry of the same attempt', async () => {
+  it('replays the same key when creating the intent failed without an answer', async () => {
     const keys: string[] = [];
-    let attempt = 0;
-    const { controller } = harness({
-      createIntent: async (_input, key) => {
-        keys.push(key);
-        attempt += 1;
-        if (attempt === 1) throw new CheckoutError('network', 'dropped', { retryable: true });
-        return intent();
+    let generated = 0;
+    const { controller } = harness(
+      {
+        createIntent: async (_input, key) => {
+          keys.push(key);
+          if (keys.length === 1) throw new CheckoutError('network', 'dropped', { retryable: true });
+          return intent();
+        },
+        confirmIntent: async () => intent({ status: 'succeeded' }),
       },
-      confirmIntent: async () => intent({ status: 'succeeded' }),
-    });
+      {
+        newIdempotencyKey: () => {
+          generated += 1;
+          return `key_${generated}`;
+        },
+      },
+    );
     controller.start();
     await settled();
     controller.handle({ type: 'select-method', methodId: card.id });
@@ -263,18 +262,176 @@ describe('paying', () => {
     await settled();
     expect(controller.getState().status).toBe('failed');
 
-    // Retry lands back on the picker; choosing again and paying is a fresh attempt.
     controller.handle({ type: 'retry' });
     controller.handle({ type: 'select-method', methodId: card.id });
     controller.handle({ type: 'pay' });
     await settled();
 
-    expect(keys).toHaveLength(2);
+    expect(keys).toEqual(['key_1', 'key_1']);
+    expect(controller.getState().status).toBe('succeeded');
+  });
+
+  it('asks the provider what happened before paying again after a lost confirm', async () => {
+    const createIntent = vi.fn(async () => intent());
+    const readIntent = vi.fn(async () => intent({ status: 'succeeded' }));
+    const { controller, seen } = harness({
+      createIntent,
+      confirmIntent: async () => {
+        throw new CheckoutError('timeout', 'too slow', { retryable: true });
+      },
+      readIntent,
+    });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    await settled();
+    expect(controller.getState()).toMatchObject({ status: 'failed', retryable: true });
+
+    controller.handle({ type: 'retry' });
+    await settled();
+
+    expect(readIntent).toHaveBeenCalledWith('pi_1', expect.anything());
+    expect(createIntent).toHaveBeenCalledOnce();
+    expect(controller.getState().status).toBe('succeeded');
+    expect(seen.filter((event) => event.type === 'payment:success')).toHaveLength(1);
+  });
+
+  it('confirms the same intent again when the provider never saw the confirm', async () => {
+    const confirmIntent = vi
+      .fn<() => Promise<PaymentIntent>>()
+      .mockRejectedValueOnce(new CheckoutError('network', 'dropped', { retryable: true }))
+      .mockResolvedValueOnce(intent({ status: 'succeeded' }));
+    const { controller } = harness({
+      confirmIntent,
+      readIntent: async () => intent({ status: 'requires_confirmation' }),
+    });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    controller.handle({ type: 'retry' });
+    await settled();
+    expect(controller.getState()).toMatchObject({ status: 'details', method: card });
+
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(confirmIntent).toHaveBeenCalledTimes(2);
     expect(controller.getState().status).toBe('succeeded');
   });
 });
 
+describe('a payment already on the wire', () => {
+  it('ignores a second click on Pay until the first one is answered', async () => {
+    const created = deferred<PaymentIntent>();
+    const confirmIntent = vi.fn(async () => intent({ status: 'succeeded' }));
+    const { controller, seen } = harness({ createIntent: () => created.promise, confirmIntent });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    controller.handle({ type: 'pay' });
+    created.resolve(intent());
+    await settled();
+
+    expect(confirmIntent).toHaveBeenCalledOnce();
+    expect(controller.getState().status).toBe('succeeded');
+    expect(seen.map((event) => event.type)).not.toContain('payment:error');
+  });
+
+  it('does not confirm once the customer has gone back', async () => {
+    const created = deferred<PaymentIntent>();
+    const confirmIntent = vi.fn(async () => intent({ status: 'succeeded' }));
+    const { controller } = harness({ createIntent: () => created.promise, confirmIntent });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    controller.handle({ type: 'go-back' });
+    created.resolve(intent());
+    await settled();
+
+    expect(confirmIntent).not.toHaveBeenCalled();
+    expect(controller.getState().status).toBe('methods');
+  });
+
+  it('cancels the request it is waiting on when the customer goes back', async () => {
+    let signal: { aborted: boolean } | undefined;
+    const { controller } = harness({
+      createIntent: (_input, _key, received) => {
+        signal = received;
+        return new Promise<PaymentIntent>(() => {});
+      },
+    });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    controller.handle({ type: 'go-back' });
+
+    expect(signal?.aborted).toBe(true);
+  });
+});
+
+describe('the 3DS challenge', () => {
+  it('fails as abandoned when the customer closes it, and reopens it on retry', async () => {
+    const challenge = intent({ status: 'requires_action', actionUrl: CHALLENGE });
+    const { controller, seen } = harness({
+      confirmIntent: async () => challenge,
+      readIntent: async () => challenge,
+    });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    controller.handle({ type: 'challenge-dismissed' });
+
+    expect(controller.getState()).toMatchObject({
+      status: 'failed',
+      retryable: true,
+      failure: { code: 'action_abandoned' },
+    });
+    expect(seen).toContainEqual(
+      expect.objectContaining({ type: 'payment:error', failure: expect.anything() }),
+    );
+
+    controller.handle({ type: 'retry' });
+    await settled();
+
+    expect(controller.getState()).toMatchObject({
+      status: 'requires_action',
+      actionUrl: CHALLENGE,
+    });
+  });
+});
+
 describe('dispose', () => {
+  it('neither confirms nor polls for a payment it was torn down in the middle of', async () => {
+    const created = deferred<PaymentIntent>();
+    const confirmIntent = vi.fn(async () => intent({ status: 'processing' }));
+    const { controller, timers } = harness({ createIntent: () => created.promise, confirmIntent });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    controller.dispose();
+    created.resolve(intent());
+    await settled();
+
+    expect(confirmIntent).not.toHaveBeenCalled();
+    expect(timers).toHaveLength(0);
+  });
+
   it('stops answering once the widget is gone', async () => {
     const { controller, timers } = harness({
       confirmIntent: async () => intent({ status: 'processing' }),
