@@ -12,6 +12,8 @@ export type DispatcherOptions = {
   /** Unset means deliveries pile up in the table and nothing leaves the process. */
   readonly url?: string | undefined;
   readonly intervalMs?: number;
+  /** Per delivery. Ticks never overlap, so one receiver that hangs holds up everyone else. */
+  readonly timeoutMs?: number;
   readonly fetcher?: Fetcher;
   readonly now?: () => number;
 };
@@ -25,6 +27,7 @@ export type WebhookDispatcher = {
 export function createWebhookDispatcher(options: DispatcherOptions): WebhookDispatcher {
   const { queue, secret, logger, url } = options;
   const intervalMs = options.intervalMs ?? 1_000;
+  const timeoutMs = options.timeoutMs ?? 10_000;
   const fetcher = options.fetcher ?? ((target, init) => fetch(target, init));
   const now = options.now ?? Date.now;
 
@@ -44,6 +47,7 @@ export function createWebhookDispatcher(options: DispatcherOptions): WebhookDisp
         method: 'POST',
         headers: { 'content-type': 'application/json', [SIGNATURE_HEADER]: signature },
         body: delivery.payload,
+        signal: AbortSignal.timeout(timeoutMs),
       });
 
       if (response.ok) {
@@ -77,20 +81,22 @@ export function createWebhookDispatcher(options: DispatcherOptions): WebhookDisp
     await queue.reschedule(delivery.id, attempts, reason, at + delay);
   }
 
+  async function tick(): Promise<{ delivered: number; failed: number }> {
+    const at = now();
+    const batch = await queue.due(at);
+    let delivered = 0;
+    let failed = 0;
+
+    for (const delivery of batch) {
+      if (await deliver(delivery, at)) delivered += 1;
+      else failed += 1;
+    }
+
+    return { delivered, failed };
+  }
+
   return {
-    async tick() {
-      const at = now();
-      const batch = await queue.due(at);
-      let delivered = 0;
-      let failed = 0;
-
-      for (const delivery of batch) {
-        if (await deliver(delivery, at)) delivered += 1;
-        else failed += 1;
-      }
-
-      return { delivered, failed };
-    },
+    tick,
 
     start() {
       if (timer) return;
@@ -104,7 +110,7 @@ export function createWebhookDispatcher(options: DispatcherOptions): WebhookDisp
         // sees a duplicate is entitled to complain about it.
         if (running) return;
         running = true;
-        void this.tick()
+        void tick()
           .catch((cause: unknown) => logger.error({ err: cause }, 'webhook tick failed'))
           .finally(() => {
             running = false;

@@ -10,7 +10,7 @@ import { docsRouter } from '../openapi/routes.ts';
 import { paymentsRouter } from '../payments/routes.ts';
 import type { PaymentsService } from '../payments/service.ts';
 import { threeDsRouter } from '../threeds/routes.ts';
-import { errorHandler, notFoundHandler } from './errors.ts';
+import { ApiError, errorHandler, notFoundHandler } from './errors.ts';
 
 export type RateLimitOptions = { readonly windowMs: number; readonly limit: number };
 
@@ -86,7 +86,19 @@ export function createApp(options: AppOptions): Express {
 
   const limits = options.rateLimit ?? { windowMs: 60_000, limit: 120 };
   if (limits !== false) {
-    app.use('/v1', rateLimit({ ...limits, standardHeaders: 'draft-7', legacyHeaders: false }));
+    app.use(
+      '/v1',
+      rateLimit({
+        ...limits,
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+        // The default answer is a line of text/html, the one reply on /v1 an SDK could not
+        // read as an error.
+        handler: (_request, _response, next) => {
+          next(new ApiError('rate_limited', 'Too many requests. Wait a moment and try again.'));
+        },
+      }),
+    );
   }
 
   app.use('/v1', express.json({ limit: '32kb' }));

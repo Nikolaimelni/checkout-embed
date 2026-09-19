@@ -1,3 +1,4 @@
+import { describeIssues } from '@checkout-embed/contracts';
 import { z } from 'zod';
 
 /**
@@ -35,10 +36,8 @@ function load(): Env {
   const parsed = EnvSchema.safeParse(process.env);
 
   if (!parsed.success) {
-    const detail = parsed.error.issues
-      .map((issue) => `  ${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
-    throw new Error(`Environment is not usable:\n${detail}`);
+    const detail = describeIssues(parsed.error).map((line) => `  ${line}`);
+    throw new Error(`Environment is not usable:\n${detail.join('\n')}`);
   }
 
   if (parsed.data.NODE_ENV === 'production' && parsed.data.WEBHOOK_SECRET === DEV_WEBHOOK_SECRET) {

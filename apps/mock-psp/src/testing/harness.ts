@@ -2,7 +2,7 @@ import type { Express } from 'express';
 import { pino } from 'pino';
 import { createDatabase, type DatabaseHandle } from '../db/client.ts';
 import { applyMigrations } from '../db/migrate.ts';
-import { createApp } from '../http/app.ts';
+import { createApp, type RateLimitOptions } from '../http/app.ts';
 import { createIntentRepository } from '../payments/repository.ts';
 import { createPaymentsService, type PaymentsService } from '../payments/service.ts';
 import { createWebhookQueue, type WebhookQueue } from '../webhooks/queue.ts';
@@ -26,7 +26,11 @@ export type Harness = {
   close(): void;
 };
 
-export async function createHarness(startAt = 1_760_000_000_000): Promise<Harness> {
+/** Rate limiting is off unless a case asks for it: a counter shared across cases is flaky. */
+export async function createHarness(
+  startAt = 1_760_000_000_000,
+  rateLimit: RateLimitOptions | false = false,
+): Promise<Harness> {
   const database = createDatabase(':memory:');
   await applyMigrations(database);
 
@@ -54,7 +58,7 @@ export async function createHarness(startAt = 1_760_000_000_000): Promise<Harnes
     bundleUrl: 'https://cdn.test/checkout.js',
     publicBaseUrl: PUBLIC_BASE_URL,
     allowedOrigins: '*',
-    rateLimit: false,
+    rateLimit,
   });
 
   return { app, clock, payments, webhooks, database, close: () => database.close() };

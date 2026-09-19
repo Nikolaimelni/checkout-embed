@@ -8,6 +8,8 @@ node_modules
 **/test-results
 **/*.db
 **/data
+**/.env
+**/.env.*
 .git
 docs
 e2e

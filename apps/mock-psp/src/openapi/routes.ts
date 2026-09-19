@@ -38,9 +38,10 @@ export function docsRouter(publicBaseUrl: string): Router {
   const router = Router();
   const document = buildOpenApiDocument(publicBaseUrl);
 
-  router.use((_request, response, next) => {
-    // Swagger UI writes styles into the document as it renders, so this one page needs
-    // inline styles. It gets them here rather than the whole service getting them.
+  // Swagger UI writes styles into the document as it renders, so these pages need inline
+  // styles. The path matters: this router sits at the root of the app, and without it the
+  // exception would replace helmet's policy on every response the service sends.
+  router.use('/docs', (_request, response, next) => {
     response.setHeader(
       'Content-Security-Policy',
       "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",

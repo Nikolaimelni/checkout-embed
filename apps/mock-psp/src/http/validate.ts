@@ -1,17 +1,14 @@
+import { describeIssues } from '@checkout-embed/contracts';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { z } from 'zod';
 import { ApiError } from './errors.ts';
-
-function issuesOf(error: z.ZodError): readonly string[] {
-  return error.issues.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`);
-}
 
 function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, where: string): T {
   const parsed = schema.safeParse(value);
   if (parsed.success) return parsed.data;
 
   throw new ApiError('bad_request', `The ${where} did not validate.`, {
-    issues: issuesOf(parsed.error),
+    issues: describeIssues(parsed.error),
   });
 }
 

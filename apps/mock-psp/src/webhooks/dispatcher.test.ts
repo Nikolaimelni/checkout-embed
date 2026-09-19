@@ -88,6 +88,28 @@ describe('createWebhookDispatcher', () => {
     expect(delivery?.lastError).toContain('ECONNREFUSED');
   });
 
+  it('gives up on a receiver that never answers instead of holding the queue', async () => {
+    const fetcher: Fetcher = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new Error('receiver timed out')));
+      });
+    const dispatcher = createWebhookDispatcher({
+      queue,
+      secret: SECRET,
+      url: URL,
+      logger,
+      fetcher,
+      now: () => NOW,
+      timeoutMs: 20,
+    });
+
+    const result = await dispatcher.tick();
+
+    expect(result).toEqual({ delivered: 0, failed: 1 });
+    const [delivery] = await queue.forIntent('pi_1');
+    expect(delivery).toMatchObject({ attempts: 1, deliveredAt: null });
+  });
+
   it('leaves a delivery alone until its next attempt is due', async () => {
     const fetcher = vi.fn<Fetcher>(async () => ({ ok: false, status: 500 }));
 

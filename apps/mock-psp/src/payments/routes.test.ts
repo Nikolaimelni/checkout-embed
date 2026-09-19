@@ -290,3 +290,54 @@ describe('cross origin access', () => {
     expect(response.headers['access-control-allow-origin']).toBeDefined();
   });
 });
+
+describe('requests that never reach a handler', () => {
+  it('answers malformed json with 400, so the SDK does not retry it as an outage', async () => {
+    const response = await post('/v1/payment-intents')
+      .set('idempotency-key', 'key_json')
+      .set('content-type', 'application/json')
+      .send('{"merchantKey": ');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('bad_request');
+  });
+
+  it('answers a body over the limit with 413', async () => {
+    const response = await post('/v1/payment-intents')
+      .set('idempotency-key', 'key_big')
+      .send({ ...intentBody(SUCCEEDS), padding: 'x'.repeat(40_000) });
+
+    expect(response.status).toBe(413);
+    expect(response.body.error.code).toBe('payload_too_large');
+  });
+
+  it('answers the rate limit in the same shape as every other error', async () => {
+    const limited = await createHarness(undefined, { windowMs: 60_000, limit: 1 });
+
+    try {
+      await request(limited.app).get(`/v1/config/${MERCHANT_KEY}`);
+      const response = await request(limited.app).get(`/v1/config/${MERCHANT_KEY}`);
+
+      expect(response.status).toBe(429);
+      expect(response.body.error.code).toBe('rate_limited');
+    } finally {
+      limited.close();
+    }
+  });
+});
+
+describe('content security policy', () => {
+  it('keeps the strict policy on the api', async () => {
+    const response = await request(harness.app).get(`/v1/config/${MERCHANT_KEY}`);
+
+    expect(response.headers['content-security-policy']).not.toContain('unsafe-inline');
+  });
+
+  it('allows inline styles on the docs page and nowhere else', async () => {
+    const response = await request(harness.app).get('/docs');
+
+    expect(response.headers['content-security-policy']).toContain(
+      "style-src 'self' 'unsafe-inline'",
+    );
+  });
+});

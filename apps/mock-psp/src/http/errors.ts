@@ -7,6 +7,7 @@ export type ApiErrorCode =
   | 'not_found'
   | 'conflict'
   | 'idempotency_conflict'
+  | 'payload_too_large'
   | 'rate_limited'
   | 'internal';
 
@@ -16,6 +17,7 @@ const STATUS: Readonly<Record<ApiErrorCode, number>> = {
   not_found: 404,
   conflict: 409,
   idempotency_conflict: 409,
+  payload_too_large: 413,
   rate_limited: 429,
   internal: 500,
 };
@@ -41,6 +43,24 @@ export function notFoundHandler(_request: Request, response: Response): void {
 }
 
 /**
+ * express.json() rejects a body it cannot read with an http-errors object rather than one
+ * of ours. The status on it is the client's mistake, and answering 500 would tell the SDK
+ * to retry the same broken request.
+ */
+function fromBodyParser(error: unknown): ApiError | null {
+  if (!(error instanceof Error) || !('status' in error)) return null;
+
+  if (error.status === 413) {
+    return new ApiError('payload_too_large', 'The request body is too large.');
+  }
+  if (typeof error.status === 'number' && error.status >= 400 && error.status < 500) {
+    return new ApiError('bad_request', 'The request body could not be read as JSON.');
+  }
+
+  return null;
+}
+
+/**
  * The only place that turns a thrown thing into a status code. Handlers throw ApiError and
  * stop caring; anything else is a bug and is reported as one without leaking its message.
  */
@@ -55,13 +75,15 @@ export function errorHandler(
     return;
   }
 
-  if (error instanceof ApiError) {
-    log().warn({ code: error.code, detail: error.detail }, error.message);
-    response.status(error.status).json({
+  const known = error instanceof ApiError ? error : fromBodyParser(error);
+
+  if (known) {
+    log().warn({ code: known.code, detail: known.detail }, known.message);
+    response.status(known.status).json({
       error: {
-        code: error.code,
-        message: error.message,
-        ...(error.detail ? { detail: error.detail } : {}),
+        code: known.code,
+        message: known.message,
+        ...(known.detail ? { detail: known.detail } : {}),
       },
     });
     return;

@@ -1,29 +1,28 @@
-# The image the mock provider is deployed as. The build stage needs the whole workspace,
-# because that is where the packages it bundles live; the runtime stage needs almost none
-# of it, because tsup put the workspace package inside dist/server.js already.
+# The image the mock provider is deployed as. The build stage installs the workspace from
+# the lockfile and bundles the server with every dependency inside it, so the runtime stage
+# installs nothing: no second resolution of versions, and no install script running as root.
 
 FROM node:24-slim AS build
 RUN corepack enable
 WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @checkout-embed/mock-psp build
+# The trailing dots build contracts first. The bundle reads it from its dist, which the
+# build context never carries.
+RUN pnpm --filter "@checkout-embed/mock-psp..." build
+# Swagger UI is served from its package directory rather than bundled. pnpm links it from
+# the store, so it is copied with the link followed.
+RUN cp -rL apps/mock-psp/node_modules/swagger-ui-dist /swagger-ui-dist
 
 FROM node:24-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
-# Only what came from the registry is left to install. The workspace dependency is dropped
-# rather than resolved: it is already in the bundle, and npm has no way to find it here.
-COPY apps/mock-psp/package.json ./
-RUN node -e "const p=require('./package.json'); delete p.dependencies['@checkout-embed/contracts']; delete p.devDependencies; p.scripts={start:'node dist/server.js'}; require('fs').writeFileSync('package.json', JSON.stringify(p, null, 2))" \
-  && npm install --omit=dev --no-audit --no-fund \
-  && npm cache clean --force
-
 COPY --from=build /repo/apps/mock-psp/dist ./dist
 # Migrations resolve from the working directory, so they sit next to dist rather than
 # inside it. See the note in src/db/migrate.ts.
 COPY --from=build /repo/apps/mock-psp/drizzle ./drizzle
+COPY --from=build /swagger-ui-dist ./node_modules/swagger-ui-dist
 
 USER node
 
