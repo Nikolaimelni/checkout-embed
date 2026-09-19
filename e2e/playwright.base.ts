@@ -37,7 +37,9 @@ export const base: PlaywrightTestConfig = {
         PORT: '4000',
         DATABASE_URL: ':memory:',
         PUBLIC_BASE_URL: PSP,
-        WIDGET_BUNDLE_URL: `${PLAIN}/sdk/bundle.js`,
+        // The same file as data-bundle on the page, with a marker only this route hands out,
+        // so a test can tell the resolved address from the fallback.
+        WIDGET_BUNDLE_URL: `${PLAIN}/sdk/bundle.js?from=config`,
         ALLOWED_ORIGINS: `${PLAIN},${NEXT}`,
         LOG_LEVEL: 'warn',
       },
@@ -53,7 +55,7 @@ export const base: PlaywrightTestConfig = {
       cwd: '../apps/demo-host-next',
       url: NEXT,
       reuseExistingServer: !process.env['CI'],
-      env: { NEXT_PUBLIC_PSP_URL: PSP },
+      env: { PSP_URL: PSP },
     },
   ],
 };

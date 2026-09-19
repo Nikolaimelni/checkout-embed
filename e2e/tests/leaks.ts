@@ -19,14 +19,23 @@ export const INSTRUMENT = `
     const state = { timers: new Set(), listeners: 0 };
     window.__leakProbe = state;
 
-    for (const kind of ['setTimeout', 'setInterval']) {
-      const original = window[kind].bind(window);
-      window[kind] = (handler, delay, ...rest) => {
-        const id = original(handler, delay, ...rest);
-        state.timers.add(id);
-        return id;
-      };
-    }
+    const originalTimeout = window.setTimeout.bind(window);
+    window.setTimeout = (handler, delay, ...rest) => {
+      // A timeout that has fired is gone, not leaked, so it leaves the count as it runs.
+      const id = originalTimeout((...args) => {
+        state.timers.delete(id);
+        if (typeof handler === 'function') handler(...args);
+      }, delay, ...rest);
+      state.timers.add(id);
+      return id;
+    };
+
+    const originalInterval = window.setInterval.bind(window);
+    window.setInterval = (handler, delay, ...rest) => {
+      const id = originalInterval(handler, delay, ...rest);
+      state.timers.add(id);
+      return id;
+    };
 
     for (const kind of ['clearTimeout', 'clearInterval']) {
       const original = window[kind].bind(window);

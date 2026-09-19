@@ -5,6 +5,7 @@ import { INSTRUMENT, outstanding } from './leaks.ts';
 const SUCCEEDS = 4999;
 const DECLINES = 1051;
 const NEEDS_3DS = 1003;
+const STALLS = 1099;
 
 /** Everything the widget renders lives in a shadow root, which Playwright pierces for us. */
 const widget = (page: Page): Locator => page.locator('#checkout');
@@ -16,14 +17,14 @@ async function open(page: Page, amountMinor: number): Promise<void> {
 
 test.describe('a shop page with no framework', () => {
   test('loads the widget through the loader and the config endpoint', async ({ page }) => {
-    const requests: string[] = [];
-    page.on('request', (request) => requests.push(request.url()));
-
     await open(page, SUCCEEDS);
 
     // The bundle address came from the provider, not from the tag: data-bundle is the
-    // fallback, and a run that quietly used it would prove nothing about the resolver.
-    expect(requests).toContainEqual('http://localhost:4000/v1/config/mk_test_acme');
+    // fallback, and only the address the config route hands out carries the marker.
+    await expect(page.locator('script[data-checkout-embed-global]')).toHaveAttribute(
+      'src',
+      /from=config/,
+    );
     await expect(widget(page).getByText('49.99')).toBeVisible();
   });
 
@@ -138,12 +139,22 @@ test.describe('style isolation', () => {
 });
 
 test.describe('teardown', () => {
-  test('terminate leaves nothing behind, twice over', async ({ page }) => {
+  test('terminate leaves nothing behind in the middle of a payment, twice over', async ({
+    page,
+  }) => {
     await page.addInitScript(INSTRUMENT);
-    await open(page, SUCCEEDS);
+    await open(page, STALLS);
+
+    // Torn down while polling a payment that never settles: a poll timer that is pending
+    // and a read that is on the wire are what a teardown most easily leaves behind.
+    const payAndWait = async (): Promise<void> => {
+      await widget(page).getByRole('button', { name: 'Card', exact: true }).click();
+      await widget(page).getByRole('button', { name: 'Pay' }).click();
+      await expect(widget(page).getByRole('status')).toHaveText('Waiting for confirmation');
+    };
 
     const mountAgain = async (): Promise<void> => {
-      await page.evaluate(() => {
+      await page.evaluate((amountMinor) => {
         const ce = (window as unknown as { checkoutEmbed: (...args: unknown[]) => void })
           .checkoutEmbed;
         ce('init', {
@@ -154,11 +165,9 @@ test.describe('teardown', () => {
           },
           auth: { getToken: () => Promise.resolve('demo-token') },
         });
-        ce('mount', '#checkout', { amount: { amountMinor: 4999, currency: 'EUR' } });
-      });
+        ce('mount', '#checkout', { amount: { amountMinor, currency: 'EUR' } });
+      }, STALLS);
       await expect(widget(page).getByText('Choose how to pay')).toBeVisible();
-      await widget(page).getByRole('button', { name: 'Card', exact: true }).click();
-      await expect(widget(page).getByRole('button', { name: 'Pay' })).toBeVisible();
     };
 
     const terminate = async () => {
@@ -171,7 +180,7 @@ test.describe('teardown', () => {
       return outstanding(page, '#checkout');
     };
 
-    await widget(page).getByRole('button', { name: 'Card', exact: true }).click();
+    await payAndWait();
     const busy = await outstanding(page, '#checkout');
     expect(busy.nodes).toBeGreaterThan(0);
 
@@ -179,6 +188,7 @@ test.describe('teardown', () => {
     expect(first.nodes).toBe(0);
 
     await mountAgain();
+    await payAndWait();
     const second = await terminate();
 
     // A leak accumulates by definition. Two identical cycles that end on the same counts
