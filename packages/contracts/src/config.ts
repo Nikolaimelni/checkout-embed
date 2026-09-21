@@ -3,6 +3,7 @@ import { array, int, object, string, url, enum as zEnum } from 'zod';
 import { CustomElementNameSchema } from './custom-element.js';
 import { MerchantKeySchema } from './identifiers.js';
 import { PaymentMethodSchema } from './payment-method.js';
+import { IntegritySchema, SecureUrlSchema } from './secure-url.js';
 
 // Intl.NumberFormat throws on a malformed tag like en_US, and the widget formats the
 // amount in its very first render.
@@ -21,7 +22,7 @@ function isLanguageTag(value: string): boolean {
 export const CheckoutConfigSchema = object({
   merchantKey: MerchantKeySchema,
   environment: zEnum(['sandbox', 'live']),
-  apiBaseUrl: url(),
+  apiBaseUrl: url({ protocol: /^https?$/ }),
   locale: string()
     .refine(isLanguageTag, { error: 'expected a BCP 47 language tag such as en-US' })
     .default('en'),
@@ -41,12 +42,13 @@ export type CheckoutConfig = z.infer<typeof CheckoutConfigSchema>;
 export type CheckoutConfigInput = z.input<typeof CheckoutConfigSchema>;
 
 /**
- * The answer from GET /v1/config/:merchantKey. This is what lets the loader resolve its
- * own bundle from the backend instead of a constant baked in at build time, which is the
- * difference between shipping a fix and asking every merchant to redeploy.
+ * The answer from GET /v1/config/:merchantKey. The loader takes the bundle address from
+ * here, so a fix ships without merchants editing their tag.
  */
 export const RemoteWidgetConfigSchema = object({
-  bundleUrl: url(),
+  bundleUrl: SecureUrlSchema,
+  /** Pins the bundle when it is served from a CDN the provider does not run. */
+  integrity: IntegritySchema.optional(),
   protocolVersion: int().positive(),
   methods: array(PaymentMethodSchema),
 });

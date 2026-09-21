@@ -28,6 +28,13 @@ describe('CheckoutConfigSchema', () => {
     expect(CheckoutConfigSchema.parse({ ...minimal, locale: 'de-CH' }).locale).toBe('de-CH');
   });
 
+  it.each(['data:text/plain,hi', 'ftp://psp.example.com'])(
+    'rejects the apiBaseUrl %s even in the sandbox',
+    (apiBaseUrl) => {
+      expect(CheckoutConfigSchema.safeParse({ ...minimal, apiBaseUrl }).success).toBe(false);
+    },
+  );
+
   it('refuses a live checkout that would talk to its provider in plain http', () => {
     const live = { ...minimal, environment: 'live', apiBaseUrl: 'http://psp.example.com' };
 
@@ -64,5 +71,28 @@ describe('RemoteWidgetConfigSchema', () => {
 
     expect(parsed.protocolVersion).toBe(1);
     expect(parsed.methods).toHaveLength(1);
+  });
+
+  it('refuses a bundle the loader would fetch over plain http', () => {
+    const result = RemoteWidgetConfigSchema.safeParse({
+      bundleUrl: 'http://cdn.example.com/checkout.js',
+      protocolVersion: 1,
+      methods: [],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('carries an integrity value when the provider pins the bundle', () => {
+    const integrity = 'sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/uxy9rx7HNQlGYl1kPzQho1wx4JwY8wC';
+
+    const parsed = RemoteWidgetConfigSchema.parse({
+      bundleUrl: 'https://cdn.example.com/checkout.js',
+      integrity,
+      protocolVersion: 1,
+      methods: [],
+    });
+
+    expect(parsed.integrity).toBe(integrity);
   });
 });

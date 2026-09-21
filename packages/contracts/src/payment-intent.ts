@@ -1,7 +1,8 @@
 import type { z } from 'zod';
-import { iso, object, url, enum as zEnum } from 'zod';
+import { iso, object, enum as zEnum } from 'zod';
 import { PaymentIntentIdSchema, PaymentMethodIdSchema } from './identifiers.js';
 import { MoneySchema } from './money.js';
+import { SecureUrlSchema } from './secure-url.js';
 
 /**
  * Provider-side status. Deliberately not the same vocabulary as the widget's own state
@@ -25,7 +26,7 @@ export const PaymentIntentSchema = object({
   methodId: PaymentMethodIdSchema.nullable(),
   createdAt: iso.datetime(),
   /** Set only while the status is requires_action. This is where the 3DS challenge lives. */
-  actionUrl: url().nullable().default(null),
+  actionUrl: SecureUrlSchema.nullable().default(null),
 });
 
 export type PaymentIntent = z.infer<typeof PaymentIntentSchema>;

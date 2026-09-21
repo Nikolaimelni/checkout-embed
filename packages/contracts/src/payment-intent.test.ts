@@ -14,6 +14,15 @@ describe('PaymentIntentSchema', () => {
     expect(PaymentIntentSchema.parse(base).actionUrl).toBeNull();
   });
 
+  it.each(['data:text/html,<p>bank</p>', 'http://acs.example.com/challenge'])(
+    'rejects a challenge at %s, which would be framed on the merchant page',
+    (actionUrl) => {
+      expect(
+        PaymentIntentSchema.safeParse({ ...base, status: 'requires_action', actionUrl }).success,
+      ).toBe(false);
+    },
+  );
+
   it('rejects a createdAt that is not an ISO timestamp', () => {
     expect(PaymentIntentSchema.safeParse({ ...base, createdAt: '2026-09-04' }).success).toBe(false);
   });

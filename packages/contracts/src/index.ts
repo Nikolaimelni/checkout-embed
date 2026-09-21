@@ -46,4 +46,10 @@ export {
   PaymentMethodSchema,
 } from './payment-method.js';
 export { MESSAGE_SOURCE, PROTOCOL_VERSION } from './protocol.js';
+export {
+  IntegritySchema,
+  isSecureUrl,
+  type SecureUrl,
+  SecureUrlSchema,
+} from './secure-url.js';
 export { type WidgetEvent, WidgetEventSchema, type WidgetEventType } from './widget-event.js';
