@@ -24,10 +24,11 @@ COPY --from=build /repo/apps/mock-psp/dist ./dist
 COPY --from=build /repo/apps/mock-psp/drizzle ./drizzle
 COPY --from=build /swagger-ui-dist ./node_modules/swagger-ui-dist
 
-USER node
-
 # Matches EXPOSE below and internal_port in fly.toml. Without it the image listens on
 # the schema default of 4000 and only Fly would know better.
 ENV PORT=8080
 EXPOSE 8080
-CMD ["node", "dist/server.js"]
+
+# A fresh Fly volume mounts at /data owned by root. The container starts as root only to
+# hand that directory to the node user, then runs the server as node.
+CMD ["sh", "-c", "if [ -d /data ]; then chown node:node /data; fi; exec setpriv --reuid=node --regid=node --init-groups node dist/server.js"]
