@@ -15,9 +15,8 @@ export function createRootLogger(level: string): Logger {
 }
 
 /**
- * The request id follows the work rather than the parameter list. Anything below the
- * route handler calls log() and gets a logger that already knows which request it is
- * serving, which is the only version of this that survives a refactor.
+ * The request id follows the work, not the parameter list. Anything below the route handler
+ * calls log() and gets a logger that already knows which request it is serving.
  */
 export function log(): Logger {
   const context = storage.getStore();

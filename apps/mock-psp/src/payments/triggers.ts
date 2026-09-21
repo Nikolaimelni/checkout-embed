@@ -2,10 +2,7 @@ export const OUTCOMES = ['succeed', 'decline', 'require_action', 'stall'] as con
 
 export type Outcome = (typeof OUTCOMES)[number];
 
-/**
- * Trigger amounts instead of randomness. A demo you cannot steer is a demo you cannot
- * record, and a test that flips a coin is not a test.
- */
+/** Trigger amounts instead of randomness, so a demo can be steered and a test repeats. */
 export const TRIGGERS: readonly { readonly amountMinor: number; readonly outcome: Outcome }[] = [
   { amountMinor: 1000, outcome: 'succeed' },
   { amountMinor: 1051, outcome: 'decline' },

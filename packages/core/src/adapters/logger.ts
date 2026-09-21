@@ -11,6 +11,6 @@ export type Logger = {
 
 export const silentLogger: Logger = {
   log() {
-    // The default. A payment widget that writes to a merchant's console uninvited is rude.
+    // The default: nothing goes to the merchant's console unless they pass a logger.
   },
 };

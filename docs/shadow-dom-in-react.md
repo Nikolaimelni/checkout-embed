@@ -144,7 +144,15 @@ useEffect(() => {
 Focusing the dialog itself rather than the first control gets its `aria-label` read out
 before the iframe takes over, which is the behaviour you want anyway.
 
-The general shape of this problem is worth internalising. Any library that reaches for
+Later the library went altogether. A native `<dialog>` opened with `showModal()` works from
+inside a shadow root: it goes into the top layer, traps focus and makes the rest of the page
+inert without any code of mine. It also fixed a bug I had not seen yet. The overlay was
+`position: fixed`, and a `transform` on any ancestor of the merchant's container turns that
+into fixed to the ancestor, clipped by its overflow. jsdom has the element but not
+`showModal`, so component tests run against a four-line stand-in, and Playwright checks the
+real one.
+
+The general shape of the problem goes beyond focus. Any library that reaches for
 `document.activeElement`, `document.querySelectorAll` or `event.target` without accounting
 for `composedPath` and `shadowRoot` will be subtly wrong inside a shadow tree, and it will
 be wrong quietly.
@@ -215,15 +223,3 @@ import { z } from 'zod';                     // 87 kB gzipped
 The library's own source has a comment acknowledging the problem for the default export.
 The named-import fix took the bundle from 163 kB to 101 kB and cost an afternoon to find,
 which is most of why this section exists.
-
-## What I would do differently
-
-Build the hostile host page first. Not the widget, not the state machine. A page with
-`* { !important }` on it and a checkbox to turn it on, before there is anything to put on
-it. Three of the six problems above were found by that page or by the tests that grew out of
-it, and every one of them would have been cheaper to find on day one than on day twenty.
-
-The rest of it, the state machine in a package with no DOM, the loader that queues calls
-before its own bundle arrives, the idempotency key that lives exactly as long as one attempt
-to pay, all of that went roughly the way the design said it would. The interesting failures
-were all at the boundary, and the boundary is the part everyone describes as solved.

@@ -19,9 +19,8 @@ export function supportsConstructableStyleSheets(view: StyleWindow): boolean {
 }
 
 /**
- * One sheet per window per stylesheet, shared by every root that adopts it. That sharing
- * is the entire reason constructable sheets exist; making a new one per widget would be
- * the slow path with extra steps.
+ * One sheet per window per stylesheet, shared by every root that adopts it, so the CSS is
+ * parsed once however many widgets are on the page.
  */
 const sheets = new WeakMap<StyleWindow, Map<string, CSSStyleSheet>>();
 
