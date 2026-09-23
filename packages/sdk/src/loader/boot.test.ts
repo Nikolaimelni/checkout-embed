@@ -1,15 +1,16 @@
-import { PROTOCOL_VERSION } from '@checkout-embed/contracts';
+import { isSecureUrl as contractsIsSecureUrl, PROTOCOL_VERSION } from '@checkout-embed/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   boot,
   DEFAULT_GLOBAL_NAME,
   DEFAULT_RESOLVE_TIMEOUT_MS,
   installQueue,
+  isSecureUrl,
   LOADER_PROTOCOL_VERSION,
   type QueueStub,
   readConfig,
   readSlot,
-  resolveBundleUrl,
+  resolveBundle,
   writeSlot,
 } from './boot.js';
 
@@ -38,6 +39,20 @@ describe('the protocol version baked into the loader', () => {
     // The loader carries a copy because it must not import a validator. Copies drift, so
     // this is the thing that stops them.
     expect(LOADER_PROTOCOL_VERSION).toBe(PROTOCOL_VERSION);
+  });
+});
+
+describe('the bundle address check baked into the loader', () => {
+  it.each([
+    'https://cdn.test/checkout.js',
+    'http://localhost:5174/sdk/bundle.js',
+    'http://[::1]/bundle.js',
+    'http://cdn.test/checkout.js',
+    'http://localhost@cdn.test/checkout.js',
+    'data:text/javascript,alert(1)',
+    '//cdn.test/checkout.js',
+  ])('agrees with contracts on %s', (value) => {
+    expect(isSecureUrl(value)).toBe(contractsIsSecureUrl(value));
   });
 });
 
@@ -142,7 +157,7 @@ describe('installQueue', () => {
   });
 });
 
-describe('resolveBundleUrl', () => {
+describe('resolveBundle', () => {
   const config = {
     merchantKey: 'mk_test',
     apiBaseUrl: 'https://api.test/',
@@ -156,9 +171,9 @@ describe('resolveBundleUrl', () => {
     const fetchImpl = vi.fn(async () => okResponse({ bundleUrl: REMOTE_BUNDLE }));
     const onFallback = vi.fn();
 
-    const url = await resolveBundleUrl(config, { fetchImpl: fetchImpl as never, onFallback });
+    const bundle = await resolveBundle(config, { fetchImpl: fetchImpl as never, onFallback });
 
-    expect(url).toBe(REMOTE_BUNDLE);
+    expect(bundle).toEqual({ url: REMOTE_BUNDLE, integrity: null });
     expect(fetchImpl).toHaveBeenCalledWith(
       'https://api.test/v1/config/mk_test',
       expect.objectContaining({ signal: expect.anything() }),
@@ -168,7 +183,23 @@ describe('resolveBundleUrl', () => {
 
   it.each([
     ['a refusal', async () => ({ ok: false, status: 503 }) as Response, '503'],
-    ['a body with no bundleUrl', async () => okResponse({}), 'no bundleUrl'],
+    ['a body with no bundleUrl', async () => okResponse({}), 'no usable bundleUrl'],
+    ['a null body', async () => okResponse(null), 'no usable bundleUrl'],
+    [
+      'a bundle over plain http',
+      async () => okResponse({ bundleUrl: 'http://cdn.test/checkout.js' }),
+      'no usable bundleUrl',
+    ],
+    [
+      'a bundle inlined as a data url',
+      async () => okResponse({ bundleUrl: 'data:text/javascript,alert(1)' }),
+      'no usable bundleUrl',
+    ],
+    [
+      'a malformed integrity value',
+      async () => okResponse({ bundleUrl: REMOTE_BUNDLE, integrity: 'md5-abc' }),
+      'integrity',
+    ],
     [
       'a network failure',
       async () => {
@@ -179,9 +210,9 @@ describe('resolveBundleUrl', () => {
   ])('falls back on %s and says why', async (_label, impl, expected) => {
     const onFallback = vi.fn();
 
-    const url = await resolveBundleUrl(config, { fetchImpl: impl as never, onFallback });
+    const bundle = await resolveBundle(config, { fetchImpl: impl as never, onFallback });
 
-    expect(url).toBe(STATIC_BUNDLE);
+    expect(bundle).toEqual({ url: STATIC_BUNDLE, integrity: null });
     expect(onFallback.mock.calls[0]?.[0]).toContain(expected);
   });
 
@@ -192,9 +223,9 @@ describe('resolveBundleUrl', () => {
         init.signal.addEventListener('abort', () => reject(new Error('aborted')));
       })) as never;
 
-    const url = await resolveBundleUrl(config, { fetchImpl: hang, onFallback });
+    const bundle = await resolveBundle(config, { fetchImpl: hang, onFallback });
 
-    expect(url).toBe(STATIC_BUNDLE);
+    expect(bundle?.url).toBe(STATIC_BUNDLE);
     expect(onFallback).toHaveBeenCalledOnce();
   });
 
@@ -202,12 +233,12 @@ describe('resolveBundleUrl', () => {
     const onFallback = vi.fn();
     const impl = (async () => ({ ok: false, status: 500 }) as Response) as never;
 
-    const url = await resolveBundleUrl(
+    const bundle = await resolveBundle(
       { ...config, staticBundleUrl: null },
       { fetchImpl: impl, onFallback },
     );
 
-    expect(url).toBeNull();
+    expect(bundle).toBeNull();
     expect(onFallback.mock.calls[0]?.[0]).toContain('no data-bundle');
   });
 });
@@ -244,6 +275,58 @@ describe('boot', () => {
     expect(document.querySelector(`script[src="${REMOTE_BUNDLE}"]`)?.getAttribute('nonce')).toBe(
       'r4nd0m',
     );
+  });
+
+  it('pins the bundle when the config carries an integrity value', async () => {
+    tag({ 'data-merchant-key': 'mk_test', 'data-api-base': 'https://api.test' });
+    const integrity = 'sha384-oqVuAfXRKap7fdgcCY5uykM6+R9GqQ8K/uxy9rx7HNQlGYl1kPzQho1wx4JwY8wC';
+
+    await boot({
+      view: window,
+      document,
+      fetchImpl: (async () => okResponse({ bundleUrl: REMOTE_BUNDLE, integrity })) as never,
+      warn: vi.fn(),
+    });
+
+    const injected = document.querySelector<HTMLScriptElement>(`script[src="${REMOTE_BUNDLE}"]`);
+    expect(injected?.integrity).toBe(integrity);
+    expect(injected?.crossOrigin).toBe('anonymous');
+  });
+
+  it('falls back to data-bundle when the resolved bundle does not load', async () => {
+    tag({
+      'data-merchant-key': 'mk_test',
+      'data-api-base': 'https://api.test',
+      'data-bundle': STATIC_BUNDLE,
+    });
+    const warn = vi.fn();
+
+    await boot({
+      view: window,
+      document,
+      fetchImpl: (async () => okResponse({ bundleUrl: REMOTE_BUNDLE })) as never,
+      warn,
+    });
+    document.querySelector(`script[src="${REMOTE_BUNDLE}"]`)?.dispatchEvent(new Event('error'));
+
+    expect(document.querySelector(`script[src="${STATIC_BUNDLE}"]`)).not.toBeNull();
+    expect(warn.mock.calls[0]?.[0]).toContain('falling back to data-bundle');
+  });
+
+  it('says so when the bundle does not load and there is nothing to fall back to', async () => {
+    tag({ 'data-merchant-key': 'mk_test', 'data-api-base': 'https://api.test' });
+    const warn = vi.fn();
+
+    await boot({
+      view: window,
+      document,
+      fetchImpl: (async () => okResponse({ bundleUrl: REMOTE_BUNDLE })) as never,
+      warn,
+    });
+    document.querySelector(`script[src="${REMOTE_BUNDLE}"]`)?.dispatchEvent(new Event('error'));
+
+    expect(document.querySelectorAll('script[data-checkout-embed-global]')).toHaveLength(1);
+    expect(warn.mock.calls[0]?.[0]).toContain('will not appear');
   });
 
   it('still queues calls when the bundle cannot be found at all', async () => {

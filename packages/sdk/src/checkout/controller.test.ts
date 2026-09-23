@@ -13,6 +13,11 @@ import { type ControllerOptions, createCheckoutController } from './controller.j
 
 const merchantKey = MerchantKeySchema.parse('mk_test_acme');
 const card = PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' });
+const wallet = PaymentMethodSchema.parse({
+  id: 'pm_wallet',
+  kind: 'apple_pay',
+  label: 'Apple Pay',
+});
 const methods: readonly PaymentMethod[] = [card];
 const total = { amountMinor: 1000, currency: 'EUR' } as const;
 const CHALLENGE = 'https://psp.test/3ds/pi_1';
@@ -159,6 +164,41 @@ describe('paying', () => {
     );
     expect(controller.getState().status).toBe('succeeded');
     expect(seen).toContainEqual({ type: 'payment:success', intentId: 'pi_1', money: total });
+  });
+
+  it('confirms under a key of its own, so a replayed confirm cannot charge twice', async () => {
+    const confirmIntent = vi.fn(async () => intent({ status: 'succeeded' }));
+    const { controller } = harness({ confirmIntent });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(confirmIntent).toHaveBeenCalledWith(
+      'pi_1',
+      card.id,
+      'key_fixed:confirm',
+      expect.objectContaining({ aborted: false }),
+    );
+  });
+
+  it('does not confirm a replayed intent that is already past confirming', async () => {
+    const confirmIntent = vi.fn(async () => intent({ status: 'succeeded' }));
+    const { controller } = harness({
+      createIntent: async () => intent({ status: 'processing' }),
+      confirmIntent,
+    });
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(confirmIntent).not.toHaveBeenCalled();
+    expect(controller.getState().status).toBe('polling');
   });
 
   it('parks on the challenge when the provider asks for one', async () => {
@@ -411,6 +451,114 @@ describe('the 3DS challenge', () => {
       status: 'requires_action',
       actionUrl: CHALLENGE,
     });
+  });
+});
+
+describe('closing a payment that has not finished', () => {
+  const challenge = intent({ status: 'requires_action', actionUrl: CHALLENGE });
+
+  async function abandonChallenge(controller: ReturnType<typeof harness>['controller']) {
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+    controller.handle({ type: 'challenge-dismissed' });
+    controller.handle({ type: 'dismiss' });
+    await settled();
+  }
+
+  function counting() {
+    let generated = 0;
+    return () => {
+      generated += 1;
+      return `key_${generated}`;
+    };
+  }
+
+  it('finds the same intent again when the customer pays with the same method', async () => {
+    const keys: string[] = [];
+    const confirmIntent = vi.fn(async () => challenge);
+    const { controller } = harness(
+      {
+        createIntent: async (_input, key) => {
+          keys.push(key);
+          return keys.length === 1 ? intent() : challenge;
+        },
+        confirmIntent,
+      },
+      { newIdempotencyKey: counting() },
+    );
+
+    await abandonChallenge(controller);
+    controller.handle({ type: 'select-method', methodId: card.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(keys).toEqual(['key_1', 'key_1']);
+    expect(confirmIntent).toHaveBeenCalledOnce();
+    expect(controller.getState()).toMatchObject({ status: 'requires_action' });
+  });
+
+  it('follows the earlier intent instead of opening a second one for another method', async () => {
+    const createIntent = vi.fn(async () => intent());
+    const readIntent = vi.fn(async () => challenge);
+    const { controller } = harness({
+      loadConfig: async () => ({
+        bundleUrl: 'https://cdn.test/c.js',
+        protocolVersion: 1,
+        methods: [card, wallet],
+      }),
+      createIntent,
+      confirmIntent: async () => challenge,
+      readIntent,
+    });
+
+    await abandonChallenge(controller);
+    controller.handle({ type: 'select-method', methodId: wallet.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(readIntent).toHaveBeenCalledWith('pi_1', expect.anything());
+    expect(createIntent).toHaveBeenCalledOnce();
+    expect(controller.getState()).toMatchObject({ status: 'requires_action' });
+  });
+
+  it('pays afresh with another method when the earlier intent was never confirmed', async () => {
+    const keys: string[] = [];
+    const { controller } = harness(
+      {
+        loadConfig: async () => ({
+          bundleUrl: 'https://cdn.test/c.js',
+          protocolVersion: 1,
+          methods: [card, wallet],
+        }),
+        createIntent: async (_input, key) => {
+          keys.push(key);
+          return intent();
+        },
+        confirmIntent: vi
+          .fn<() => Promise<PaymentIntent>>()
+          .mockRejectedValueOnce(new CheckoutError('timeout', 'too slow', { retryable: true }))
+          .mockResolvedValueOnce(intent({ status: 'succeeded' })),
+        readIntent: async () => intent({ status: 'requires_confirmation' }),
+      },
+      { newIdempotencyKey: counting() },
+    );
+    controller.start();
+    await settled();
+    controller.handle({ type: 'select-method', methodId: card.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+    controller.handle({ type: 'dismiss' });
+    await settled();
+
+    controller.handle({ type: 'select-method', methodId: wallet.id });
+    controller.handle({ type: 'pay' });
+    await settled();
+
+    expect(keys).toEqual(['key_1', 'key_2']);
+    expect(controller.getState().status).toBe('succeeded');
   });
 });
 

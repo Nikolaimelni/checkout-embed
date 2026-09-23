@@ -4,6 +4,7 @@ import {
   type Money,
   type PaymentIntent,
   type PaymentIntentId,
+  type PaymentIntentStatus,
   type PaymentMethodId,
 } from '@checkout-embed/contracts';
 import {
@@ -22,6 +23,13 @@ import type { WidgetIntent, WidgetStore } from '@checkout-embed/widget';
 import type { CheckoutApi } from './client.js';
 
 export const DEFAULT_POLL_INTERVAL_MS = 1_500;
+
+/** Statuses that can still end in a charge, or already have. */
+const LIVE: ReadonlySet<PaymentIntentStatus> = new Set([
+  'requires_action',
+  'processing',
+  'succeeded',
+]);
 
 export type ControllerOptions = {
   readonly api: CheckoutApi;
@@ -251,15 +259,33 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     }
   }
 
+  /**
+   * An intent left behind by an earlier attempt may still settle. Paying with another
+   * method opens a new intent, so the old one is checked first, and if it is still going
+   * somewhere the screen follows it instead of charging the customer twice.
+   */
+  async function resumed(intentId: PaymentIntentId, current: Attempt): Promise<boolean> {
+    const intent = await api.readIntent(intentId, current.abort.signal);
+    if (current.abort.signal.aborted) return true;
+    if (!LIVE.has(intent.status)) return false;
+
+    current.intentId = intent.id;
+    if (dispatch({ type: 'intent/created', intent })) apply(intent);
+    return true;
+  }
+
   function pay(): void {
     if (state.status !== 'details' || attempt?.busy) return;
 
     const method = state.method;
+    const earlier = attempt !== null && attempt.methodId !== method.id ? attempt : null;
     const current = attemptFor(method.id);
     current.busy = true;
 
     run(async () => {
       try {
+        if (earlier?.intentId && (await resumed(earlier.intentId, current))) return;
+
         const created = await api.createIntent(
           { merchantKey, money: total, methodId: method.id },
           current.key,
@@ -272,7 +298,18 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
         // so stopping leaves an intent that nobody will ever charge.
         if (!dispatch({ type: 'intent/created', intent: created })) return;
 
-        const confirmed = await api.confirmIntent(created.id, method.id, current.abort.signal);
+        // A replayed key can hand back an intent that was confirmed last time round.
+        if (created.status !== 'requires_confirmation') {
+          apply(created);
+          return;
+        }
+
+        const confirmed = await api.confirmIntent(
+          created.id,
+          method.id,
+          `${current.key}:confirm`,
+          current.abort.signal,
+        );
         if (!current.abort.signal.aborted) apply(confirmed);
       } finally {
         current.busy = false;
@@ -369,8 +406,10 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           return;
 
         case 'dismiss':
+          // The attempt survives Close. A payment that timed out or lost its challenge can
+          // still settle, and the next Pay has to find it rather than open a second one.
           abandonRequests();
-          settle();
+          stopPolling();
           if (dispatch({ type: 'checkout/reset' })) loadMethods();
       }
     },

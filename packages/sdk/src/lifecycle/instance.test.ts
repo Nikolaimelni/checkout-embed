@@ -98,6 +98,29 @@ describe('mount', () => {
     expect(document.querySelector('#pay-here')?.shadowRoot?.textContent).toContain('Card');
   });
 
+  it('asks the provider for the method list once, however many widgets it mounts', async () => {
+    const psp = createFakePsp();
+    const instance = instanceWith(psp);
+
+    instance.mount(host('first'), { amount });
+    instance.mount(host('second'), { amount });
+    await settled();
+
+    expect(psp.calls.filter((url) => url.includes('/v1/config/'))).toHaveLength(1);
+  });
+
+  it('asks again after a load that failed', async () => {
+    const failing = createFakePsp({ configStatus: 503 });
+    const instance = instanceWith(failing);
+
+    instance.mount(host('first'), { amount });
+    await settled();
+    instance.mount(host('second'), { amount });
+    await settled();
+
+    expect(failing.calls.filter((url) => url.includes('/v1/config/'))).toHaveLength(2);
+  });
+
   it('says so when the selector matches nothing', () => {
     expect(() => instanceWith().mount('#missing', { amount })).toThrow(/Nothing on the page/);
   });

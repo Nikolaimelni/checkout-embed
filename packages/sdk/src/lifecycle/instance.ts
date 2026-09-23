@@ -7,6 +7,7 @@ import {
   type MerchantKey,
   type Money,
   type PaymentMethodId,
+  type RemoteWidgetConfig,
 } from '@checkout-embed/contracts';
 import {
   type AuthAdapter,
@@ -27,7 +28,7 @@ import {
   type WidgetView,
 } from '@checkout-embed/widget';
 import { createFetchHttp } from '../adapters/http-fetch.js';
-import { createCheckoutApi } from '../checkout/client.js';
+import { type CheckoutApi, createCheckoutApi } from '../checkout/client.js';
 import { type CheckoutController, createCheckoutController } from '../checkout/controller.js';
 
 export type CheckoutOptions = {
@@ -95,6 +96,27 @@ function resolveTarget(view: Window, target: Element | string): Element {
   return found;
 }
 
+/**
+ * One method list per instance. Without this every mount, and every Close, asked the
+ * provider again for the same answer. A failed load is dropped so Try again really retries.
+ */
+function cachingConfig(api: CheckoutApi): CheckoutApi {
+  let config: Promise<RemoteWidgetConfig> | null = null;
+
+  return {
+    ...api,
+    // No signal: the request is shared, and one widget going away must not cancel it for
+    // the others waiting on it.
+    loadConfig(merchantKey) {
+      config ??= api.loadConfig(merchantKey).catch((cause: unknown) => {
+        config = null;
+        throw cause;
+      });
+      return config;
+    },
+  };
+}
+
 function parseConfig(input: CheckoutConfigInput): CheckoutConfig {
   const parsed = CheckoutConfigSchema.safeParse(input);
 
@@ -123,12 +145,14 @@ export function init(options: CheckoutOptions): CheckoutInstance {
   const view = options.view ?? window;
   const logger = options.logger ?? silentLogger;
   const events: EventBus = createEventBus({ logger });
-  const api = createCheckoutApi(
-    createFetchHttp({
-      baseUrl: config.apiBaseUrl,
-      auth: options.auth,
-      ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
-    }),
+  const api = cachingConfig(
+    createCheckoutApi(
+      createFetchHttp({
+        baseUrl: config.apiBaseUrl,
+        auth: options.auth,
+        ...(options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}),
+      }),
+    ),
   );
 
   const mounts = new Map<Element, Mounted>();

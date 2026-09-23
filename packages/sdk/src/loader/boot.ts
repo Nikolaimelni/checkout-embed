@@ -58,6 +58,21 @@ function originOf(url: string, fallback: string): string {
   }
 }
 
+const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
+
+/** A copy of isSecureUrl from contracts, for the same reason the version above is a copy. */
+export function isSecureUrl(value: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(value);
+    if (protocol === 'https:') return true;
+    return protocol === 'http:' && (LOOPBACK.includes(hostname) || hostname.endsWith('.localhost'));
+  } catch {
+    return false;
+  }
+}
+
+const INTEGRITY = /^sha(256|384|512)-[A-Za-z0-9+/]+={0,2}$/;
+
 export function findOwnScript(document: Document): HTMLScriptElement | null {
   const current = document.currentScript;
   if (current instanceof HTMLScriptElement) return current;
@@ -115,16 +130,35 @@ export type ResolveOptions = {
   readonly onFallback: (reason: string) => void;
 };
 
-/**
- * Asks the backend where the bundle lives, and falls back to the address baked into the
- * tag when it cannot. Resolving from the backend is what lets a fix ship without every
- * merchant redeploying; the fallback is what stops that hook from being a single point of
- * failure in front of somebody's checkout.
- */
-export async function resolveBundleUrl(
+export type Bundle = {
+  readonly url: string;
+  readonly integrity: string | null;
+};
+
+function fallbackOf(config: LoaderConfig): Bundle | null {
+  return config.staticBundleUrl === null ? null : { url: config.staticBundleUrl, integrity: null };
+}
+
+function readBundle(body: unknown): Bundle {
+  const { bundleUrl, integrity } = (body ?? {}) as { bundleUrl?: unknown; integrity?: unknown };
+
+  // The script lands on the merchant's page with their nonce, so the address is checked
+  // here and not taken on trust from whatever answered.
+  if (typeof bundleUrl !== 'string' || !isSecureUrl(bundleUrl)) {
+    throw new Error('the config had no usable bundleUrl');
+  }
+  if (integrity !== undefined && (typeof integrity !== 'string' || !INTEGRITY.test(integrity))) {
+    throw new Error('the config carried a malformed integrity value');
+  }
+
+  return { url: bundleUrl, integrity: integrity ?? null };
+}
+
+/** Asks the backend where the bundle lives, and falls back to data-bundle when it cannot. */
+export async function resolveBundle(
   config: LoaderConfig,
   options: ResolveOptions,
-): Promise<string | null> {
+): Promise<Bundle | null> {
   const url = `${config.apiBaseUrl.replace(/\/$/, '')}/v1/config/${encodeURIComponent(config.merchantKey)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -133,13 +167,7 @@ export async function resolveBundleUrl(
     const response = await options.fetchImpl(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`the config endpoint answered ${response.status}`);
 
-    const body: unknown = await response.json();
-    const bundleUrl = (body as { bundleUrl?: unknown }).bundleUrl;
-    if (typeof bundleUrl !== 'string' || bundleUrl.length === 0) {
-      throw new Error('the config had no bundleUrl');
-    }
-
-    return bundleUrl;
+    return readBundle(await response.json());
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : String(cause);
     options.onFallback(
@@ -147,23 +175,29 @@ export async function resolveBundleUrl(
         ? `${reason}, and the tag carries no data-bundle to fall back to`
         : `${reason}, falling back to data-bundle`,
     );
-    return config.staticBundleUrl;
+    return fallbackOf(config);
   } finally {
     clearTimeout(timer);
   }
 }
 
-export function injectBundle(document: Document, config: LoaderConfig, bundleUrl: string): void {
+export function injectBundle(
+  document: Document,
+  config: LoaderConfig,
+  bundle: Bundle,
+  onError?: () => void,
+): void {
   const script = document.createElement('script');
   script.type = 'module';
   script.async = true;
-  script.src = bundleUrl;
+  script.src = bundle.url;
   script.crossOrigin = 'anonymous';
   script.dataset['checkoutEmbedGlobal'] = config.globalName;
+  if (bundle.integrity !== null) script.integrity = bundle.integrity;
 
-  // A merchant with a strict policy hands us a nonce on their tag; without passing it on,
-  // the script we inject is the one thing their CSP blocks.
+  // Without the merchant's nonce a strict CSP blocks the one script we inject.
   if (config.nonce !== null) script.setAttribute('nonce', config.nonce);
+  if (onError) script.addEventListener('error', onError, { once: true });
 
   (document.head ?? document.documentElement).append(script);
 }
@@ -198,21 +232,32 @@ export async function boot(options: BootOptions): Promise<string | null> {
 
   if (typeof fetchImpl !== 'function') {
     warn('checkout-embed: this browser has no fetch, using data-bundle');
-    if (config.staticBundleUrl === null) return null;
-    injectBundle(document, config, config.staticBundleUrl);
-    return config.staticBundleUrl;
+    const fallback = fallbackOf(config);
+    if (fallback === null) return null;
+    injectBundle(document, config, fallback);
+    return fallback.url;
   }
 
-  const bundleUrl = await resolveBundleUrl(config, {
+  const bundle = await resolveBundle(config, {
     fetchImpl,
     onFallback: (reason) => warn(`checkout-embed: could not resolve the bundle (${reason})`),
   });
 
-  if (bundleUrl === null) {
+  if (bundle === null) {
     warn('checkout-embed: no bundle to load, the widget will not appear');
     return null;
   }
 
-  injectBundle(document, config, bundleUrl);
-  return bundleUrl;
+  // The config can answer and still name a file that does not load: a bad deploy, a CDN
+  // outage, an integrity mismatch. data-bundle is the merchant's own copy for that case.
+  const fallback = fallbackOf(config);
+  injectBundle(document, config, bundle, () => {
+    if (fallback === null || fallback.url === bundle.url) {
+      warn(`checkout-embed: ${bundle.url} did not load, the widget will not appear`);
+      return;
+    }
+    warn(`checkout-embed: ${bundle.url} did not load, falling back to data-bundle`);
+    injectBundle(document, config, fallback);
+  });
+  return bundle.url;
 }

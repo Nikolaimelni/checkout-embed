@@ -30,6 +30,7 @@ export type CheckoutApi = {
   confirmIntent(
     id: PaymentIntentId,
     methodId: PaymentMethodId,
+    idempotencyKey: string,
     signal?: AbortLike,
   ): Promise<PaymentIntent>;
   readIntent(id: PaymentIntentId, signal?: AbortLike): Promise<PaymentIntent>;
@@ -116,12 +117,13 @@ export function createCheckoutApi(http: HttpAdapter): CheckoutApi {
       return parse(PaymentIntentSchema, response);
     },
 
-    async confirmIntent(id, methodId, signal) {
+    async confirmIntent(id, methodId, idempotencyKey, signal) {
       const response = ok(
         await http.send({
           method: 'POST',
           path: `/v1/payment-intents/${encodeURIComponent(id)}/confirm`,
           body: { methodId },
+          idempotencyKey,
           ...withSignal(signal),
         }),
       );
