@@ -20,6 +20,7 @@ export type AppOptions = {
   readonly logger: Logger;
   readonly merchantKeys: readonly string[];
   readonly bundleUrl: string;
+  readonly bundleIntegrity?: string | undefined;
   readonly publicBaseUrl: string;
   /** Origins allowed to call /v1, or '*' for anyone. */
   readonly allowedOrigins: readonly string[] | '*';
@@ -102,10 +103,14 @@ export function createApp(options: AppOptions): Express {
   }
 
   app.use('/v1', express.json({ limit: '32kb' }));
-  app.use('/v1/payment-intents', paymentsRouter(options.payments));
+  app.use('/v1/payment-intents', paymentsRouter(options.payments, options.merchantKeys));
   app.use(
     '/v1/config',
-    merchantsRouter({ merchantKeys: options.merchantKeys, bundleUrl: options.bundleUrl }),
+    merchantsRouter({
+      merchantKeys: options.merchantKeys,
+      bundleUrl: options.bundleUrl,
+      bundleIntegrity: options.bundleIntegrity,
+    }),
   );
 
   app.use('/3ds', threeDsRouter(options.payments));

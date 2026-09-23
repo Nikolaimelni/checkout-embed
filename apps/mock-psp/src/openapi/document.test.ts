@@ -27,6 +27,15 @@ describe('buildOpenApiDocument', () => {
     expect(properties['status']).toBeDefined();
   });
 
+  it('asks for an Idempotency-Key on both calls that move money', () => {
+    const paths = document.paths as Record<string, { post: { parameters: { name: string }[] } }>;
+
+    for (const path of ['/v1/payment-intents', '/v1/payment-intents/{id}/confirm']) {
+      const names = paths[path]?.post.parameters.map((parameter) => parameter.name);
+      expect(names).toContain('Idempotency-Key');
+    }
+  });
+
   it('carries no $schema key, which OpenAPI does not want inside components', () => {
     for (const schema of Object.values(document.components.schemas)) {
       expect(schema['$schema']).toBeUndefined();

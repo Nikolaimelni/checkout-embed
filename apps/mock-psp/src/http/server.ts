@@ -36,6 +36,7 @@ const app = createApp({
   logger,
   merchantKeys: env.merchantKeys,
   bundleUrl: env.WIDGET_BUNDLE_URL,
+  bundleIntegrity: env.WIDGET_BUNDLE_INTEGRITY,
   publicBaseUrl: env.PUBLIC_BASE_URL,
   allowedOrigins: env.allowedOrigins,
 });

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ApiError } from '../http/errors.ts';
 import {
   bearerGuard,
   idempotencyGuard,
@@ -16,8 +17,9 @@ import {
 } from './dto.ts';
 import type { PaymentsService } from './service.ts';
 
-export function paymentsRouter(service: PaymentsService): Router {
+export function paymentsRouter(service: PaymentsService, merchantKeys: readonly string[]): Router {
   const router = Router();
+  const known = new Set(merchantKeys);
 
   router.post(
     '/',
@@ -26,6 +28,11 @@ export function paymentsRouter(service: PaymentsService): Router {
     validate({ body: CreateIntentBodySchema }),
     async (_request, response) => {
       const { body } = validated<CreateIntentBody>(response);
+      // The answer the config route gives, so an unregistered key cannot open intents either.
+      if (!known.has(body.merchantKey)) {
+        throw new ApiError('not_found', `No merchant is registered under ${body.merchantKey}.`);
+      }
+
       const { intent, replayed } = await service.create(body, idempotencyKeyOf(response));
 
       // 201 the first time, 200 on a replay. A merchant retrying after a dropped connection
@@ -37,11 +44,12 @@ export function paymentsRouter(service: PaymentsService): Router {
   router.post(
     '/:id/confirm',
     bearerGuard,
+    idempotencyGuard,
     validate({ params: IntentParamsSchema, body: ConfirmIntentBodySchema }),
     async (_request, response) => {
       const { params, body } = validated<ConfirmIntentBody, IntentParams>(response);
 
-      response.json(await service.confirm(params.id, body));
+      response.json(await service.confirm(params.id, body, idempotencyKeyOf(response)));
     },
   );
 

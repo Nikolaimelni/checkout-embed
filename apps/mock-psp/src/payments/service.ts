@@ -17,7 +17,7 @@ export type CreateResult = { readonly intent: PaymentIntent; readonly replayed: 
 
 export type PaymentsService = {
   create(body: CreateIntentBody, idempotencyKey: string): Promise<CreateResult>;
-  confirm(id: string, body: ConfirmIntentBody): Promise<PaymentIntent>;
+  confirm(id: string, body: ConfirmIntentBody, idempotencyKey: string): Promise<PaymentIntent>;
   read(id: string): Promise<PaymentIntent>;
   completeChallenge(id: string, approved: boolean): Promise<PaymentIntent>;
   settleDue(): Promise<number>;
@@ -38,22 +38,9 @@ function toDto(row: IntentRow): PaymentIntent {
   });
 }
 
-/**
- * An array of primitives in a fixed order rather than JSON.stringify over the object.
- * Key order in an object literal is stable in practice and not something an idempotency
- * check should be resting on.
- */
-function hashRequest(body: CreateIntentBody): string {
-  return createHash('sha256')
-    .update(
-      JSON.stringify([
-        body.merchantKey,
-        body.money.amountMinor,
-        body.money.currency,
-        body.methodId,
-      ]),
-    )
-    .digest('hex');
+/** Primitives in a fixed order, so the hash does not rest on an object's key order. */
+function hashRequest(parts: readonly unknown[]): string {
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
 export function createPaymentsService(options: PaymentsServiceOptions): PaymentsService {
@@ -94,7 +81,12 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
 
   return {
     async create(body, idempotencyKey) {
-      const hash = hashRequest(body);
+      const hash = hashRequest([
+        body.merchantKey,
+        body.money.amountMinor,
+        body.money.currency,
+        body.methodId,
+      ]);
       const seen = await repository.findKey(body.merchantKey, idempotencyKey);
 
       if (seen) {
@@ -135,8 +127,23 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       return { intent: toDto(row), replayed: false };
     },
 
-    async confirm(id, body) {
+    async confirm(id, body, idempotencyKey) {
       const row = await mustFind(id);
+      const hash = hashRequest(['confirm', id, body.methodId]);
+      const seen = await repository.findKey(row.merchantKey, idempotencyKey);
+
+      // A confirm whose answer got lost comes back under the same key and gets the intent as
+      // it stands, rather than a 409 the SDK would have to read as a failed payment.
+      if (seen) {
+        if (seen.requestHash !== hash) {
+          throw new ApiError(
+            'idempotency_conflict',
+            'This Idempotency-Key was already used with a different request.',
+            { idempotencyKey },
+          );
+        }
+        return toDto(row);
+      }
 
       if (row.status !== 'requires_confirmation') {
         throw new ApiError(
@@ -175,6 +182,13 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       })();
 
       await repository.patch(id, patch);
+      await repository.saveKey({
+        merchantKey: row.merchantKey,
+        key: idempotencyKey,
+        requestHash: hash,
+        intentId: id,
+        createdAt: at,
+      });
       const next = { ...row, ...patch };
 
       if (next.status === 'failed') await announce(next, 'payment_intent.failed', at);

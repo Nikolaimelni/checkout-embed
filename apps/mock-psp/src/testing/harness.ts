@@ -9,7 +9,7 @@ import { createWebhookQueue, type WebhookQueue } from '../webhooks/queue.ts';
 
 export const MERCHANT_KEY = 'mk_test_acme';
 export const BEARER = 'Bearer test-token';
-export const PUBLIC_BASE_URL = 'http://psp.test';
+export const PUBLIC_BASE_URL = 'https://psp.test';
 
 /** A clock the tests move by hand, so settlement is a fact rather than a wait. */
 export type Clock = {

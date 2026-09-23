@@ -32,6 +32,15 @@ function triggerTable(): string {
 
 const bearer = [{ bearerAuth: [] as string[] }];
 
+const idempotencyKey = {
+  name: 'Idempotency-Key',
+  in: 'header',
+  required: true,
+  schema: { type: 'string', maxLength: 255 },
+};
+
+const intentId = { name: 'id', in: 'path', required: true, schema: { type: 'string' } };
+
 const jsonBody = (schema: JsonSchema) => ({ content: { 'application/json': { schema } } });
 
 export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unknown> {
@@ -75,16 +84,9 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
         post: {
           summary: 'Create a payment intent',
           description:
-            'Requires an Idempotency-Key. The same key with the same body replays the original intent and answers 200; the same key with a different body answers 409.',
+            'Requires an Idempotency-Key. The same key with the same body replays the original intent and answers 200; the same key with a different body answers 409. A merchant key that is not registered answers 404.',
           security: bearer,
-          parameters: [
-            {
-              name: 'Idempotency-Key',
-              in: 'header',
-              required: true,
-              schema: { type: 'string', maxLength: 255 },
-            },
-          ],
+          parameters: [idempotencyKey],
           requestBody: {
             required: true,
             ...jsonBody({ $ref: '#/components/schemas/CreateIntentBody' }),
@@ -98,7 +100,7 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
               description: 'Replay of an earlier request with the same key',
               ...jsonBody({ $ref: '#/components/schemas/PaymentIntent' }),
             },
-            ...errors([400, 401, 409]),
+            ...errors([400, 401, 404, 409]),
           },
         },
       },
@@ -108,7 +110,7 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
           description:
             'A processing intent settles here once its delay has passed, which is what makes polling work without a scheduler.',
           security: bearer,
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [intentId],
           responses: {
             '200': {
               description: 'The intent',
@@ -122,9 +124,9 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
         post: {
           summary: 'Confirm a payment intent',
           description:
-            'Moves the intent out of requires_confirmation. Depending on the trigger amount the answer is requires_action with a challenge link, processing, or failed.',
+            'Moves the intent out of requires_confirmation. Depending on the trigger amount the answer is requires_action with a challenge link, processing, or failed. Requires an Idempotency-Key: the same key again answers with the intent as it stands, a different key on an intent already confirmed answers 409.',
           security: bearer,
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          parameters: [intentId, idempotencyKey],
           requestBody: {
             required: true,
             ...jsonBody({ $ref: '#/components/schemas/ConfirmIntentBody' }),

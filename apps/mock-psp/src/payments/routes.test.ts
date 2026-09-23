@@ -36,6 +36,9 @@ async function createIntent(amountMinor: number, key = `key_${amountMinor}`) {
   return response.body as { id: string; status: string; actionUrl: string | null };
 }
 
+const confirm = (id: string, key = `confirm_${id}`, methodId = 'pm_card') =>
+  post(`/v1/payment-intents/${id}/confirm`).set('idempotency-key', key).send({ methodId });
+
 describe('POST /v1/payment-intents', () => {
   it('refuses a request without a bearer token', async () => {
     const response = await request(harness.app)
@@ -82,6 +85,14 @@ describe('POST /v1/payment-intents', () => {
     expect(second.body.error.code).toBe('idempotency_conflict');
   });
 
+  it('refuses an intent for a merchant nobody registered', async () => {
+    const response = await post('/v1/payment-intents')
+      .set('idempotency-key', 'key_stranger')
+      .send({ ...intentBody(SUCCEEDS), merchantKey: 'mk_test_someone_else' });
+
+    expect(response.status).toBe(404);
+  });
+
   it('gives different keys different intents', async () => {
     const first = await createIntent(SUCCEEDS, 'key_a');
     const second = await createIntent(SUCCEEDS, 'key_b');
@@ -114,9 +125,7 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
   it('puts a plain payment into processing and settles it after the delay', async () => {
     const intent = await createIntent(SUCCEEDS);
 
-    const confirmed = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
-      methodId: 'pm_card',
-    });
+    const confirmed = await confirm(intent.id);
     expect(confirmed.body.status).toBe('processing');
 
     const early = await get(`/v1/payment-intents/${intent.id}`);
@@ -130,9 +139,7 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
   it('fails the declining amount straight away', async () => {
     const intent = await createIntent(DECLINES);
 
-    const confirmed = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
-      methodId: 'pm_card',
-    });
+    const confirmed = await confirm(intent.id);
 
     expect(confirmed.body.status).toBe('failed');
   });
@@ -140,17 +147,15 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
   it('hands back a challenge link for the 3DS amount', async () => {
     const intent = await createIntent(NEEDS_3DS);
 
-    const confirmed = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
-      methodId: 'pm_card',
-    });
+    const confirmed = await confirm(intent.id);
 
     expect(confirmed.body.status).toBe('requires_action');
-    expect(confirmed.body.actionUrl).toBe(`http://psp.test/3ds/${intent.id}`);
+    expect(confirmed.body.actionUrl).toBe(`https://psp.test/3ds/${intent.id}`);
   });
 
   it('leaves the stalling amount in processing however long you wait', async () => {
     const intent = await createIntent(NEVER_SETTLES);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
 
     harness.clock.advance(30 * 60 * 1_000);
     const later = await get(`/v1/payment-intents/${intent.id}`);
@@ -158,15 +163,44 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
     expect(later.body.status).toBe('processing');
   });
 
-  it('refuses to confirm an intent twice', async () => {
+  it('refuses to confirm an intent twice under two keys', async () => {
     const intent = await createIntent(SUCCEEDS);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id, 'confirm_first');
 
-    const again = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
+    const again = await confirm(intent.id, 'confirm_second');
+
+    expect(again.status).toBe(409);
+  });
+
+  it('replays a confirm that comes back under the same key', async () => {
+    const intent = await createIntent(SUCCEEDS);
+    const first = await confirm(intent.id, 'confirm_lost');
+
+    const again = await confirm(intent.id, 'confirm_lost');
+
+    expect(again.status).toBe(200);
+    expect(again.body).toEqual(first.body);
+  });
+
+  it('answers 409 when a confirm key comes back with another method', async () => {
+    const intent = await createIntent(SUCCEEDS);
+    await confirm(intent.id, 'confirm_switched');
+
+    const again = await confirm(intent.id, 'confirm_switched', 'pm_apple_pay');
+
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('idempotency_conflict');
+  });
+
+  it('refuses a confirm without an idempotency key, because it moves money', async () => {
+    const intent = await createIntent(SUCCEEDS);
+
+    const response = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
       methodId: 'pm_card',
     });
 
-    expect(again.status).toBe(409);
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain('Idempotency-Key');
   });
 
   it('answers 404 for an intent that does not exist', async () => {
@@ -179,7 +213,7 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
 describe('the 3DS challenge', () => {
   it('walks approve through to a settled payment', async () => {
     const intent = await createIntent(NEEDS_3DS);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
 
     const page = await request(harness.app).get(`/3ds/${intent.id}`);
     expect(page.status).toBe(200);
@@ -197,7 +231,7 @@ describe('the 3DS challenge', () => {
 
   it('fails the payment when the challenge is rejected', async () => {
     const intent = await createIntent(NEEDS_3DS, 'key_reject');
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
 
     await request(harness.app)
       .post(`/3ds/${intent.id}/complete`)
@@ -210,7 +244,7 @@ describe('the 3DS challenge', () => {
 
   it('lets a merchant page frame it', async () => {
     const intent = await createIntent(NEEDS_3DS, 'key_frame');
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
 
     const page = await request(harness.app).get(`/3ds/${intent.id}`);
 
@@ -222,7 +256,7 @@ describe('the 3DS challenge', () => {
 describe('webhooks raised by the payment lifecycle', () => {
   it('queues one when a payment settles', async () => {
     const intent = await createIntent(SUCCEEDS);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
     harness.clock.advance(SETTLE_DELAY_MS);
     await get(`/v1/payment-intents/${intent.id}`);
 
@@ -238,7 +272,7 @@ describe('webhooks raised by the payment lifecycle', () => {
 
   it('queues one when a payment is declined', async () => {
     const intent = await createIntent(DECLINES);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
 
     const queued = await harness.webhooks.forIntent(intent.id);
 
@@ -247,7 +281,7 @@ describe('webhooks raised by the payment lifecycle', () => {
 
   it('raises nothing twice for the same settlement', async () => {
     const intent = await createIntent(SUCCEEDS);
-    await post(`/v1/payment-intents/${intent.id}/confirm`).send({ methodId: 'pm_card' });
+    await confirm(intent.id);
     harness.clock.advance(SETTLE_DELAY_MS);
 
     await get(`/v1/payment-intents/${intent.id}`);
@@ -288,6 +322,22 @@ describe('cross origin access', () => {
       .set('origin', 'https://shop.example');
 
     expect(response.headers['access-control-allow-origin']).toBeDefined();
+  });
+});
+
+describe('request ids', () => {
+  it('echoes a plain id the caller sent', async () => {
+    const response = await request(harness.app).get('/healthz').set('x-request-id', 'req_42.a-b');
+
+    expect(response.headers['x-request-id']).toBe('req_42.a-b');
+  });
+
+  it('replaces one it would not want in a log line', async () => {
+    const response = await request(harness.app)
+      .get('/healthz')
+      .set('x-request-id', '<script>alert(1)</script>');
+
+    expect(response.headers['x-request-id']).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 

@@ -8,6 +8,7 @@ import { SUPPORTED_METHODS } from './methods.ts';
 export type MerchantConfigOptions = {
   readonly merchantKeys: readonly string[];
   readonly bundleUrl: string;
+  readonly bundleIntegrity?: string | undefined;
 };
 
 export function merchantsRouter(options: MerchantConfigOptions): Router {
@@ -24,6 +25,7 @@ export function merchantsRouter(options: MerchantConfigOptions): Router {
     response.json(
       RemoteWidgetConfigSchema.parse({
         bundleUrl: options.bundleUrl,
+        ...(options.bundleIntegrity ? { integrity: options.bundleIntegrity } : {}),
         protocolVersion: PROTOCOL_VERSION,
         methods: SUPPORTED_METHODS,
       }),
