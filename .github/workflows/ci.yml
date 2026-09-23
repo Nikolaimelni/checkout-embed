@@ -88,6 +88,7 @@ jobs:
             -e WEBHOOK_SECRET=ci-secret-that-is-not-used-for-anything \
             -e DATABASE_URL=/tmp/psp.db \
             -e PUBLIC_BASE_URL=http://localhost:8080 \
+            -e ALLOWED_ORIGINS=http://localhost:5174 \
             checkout-embed-psp:ci
 
           for attempt in $(seq 1 30); do

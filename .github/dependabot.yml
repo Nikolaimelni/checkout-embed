@@ -5,3 +5,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  # Reads pnpm-lock.yaml. Grouped, so a week of patch releases is one pull request.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /apps/mock-psp
+    schedule:
+      interval: weekly

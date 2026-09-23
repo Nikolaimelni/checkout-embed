@@ -6,16 +6,17 @@ on:
 
 concurrency: release
 
-permissions:
-  contents: write
-  pull-requests: write
-  # npm provenance: the registry signs the package against this workflow run, so anyone can
-  # check that what they installed came from this repository and this commit.
-  id-token: write
+permissions: {}
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # Trusted publishing: npm trades this for a short-lived token and signs provenance
+      # against this run, so the repository keeps no npm token at all.
+      id-token: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -31,6 +32,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # This job does not wait for ci, so it runs the same checks before anything can reach
+      # the registry. pnpm release builds.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
       # Opens a release pull request while changesets are pending, and publishes once that
       # pull request is merged.
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
@@ -40,5 +47,3 @@ jobs:
           title: 'chore: release'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: 'true'
