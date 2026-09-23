@@ -36,6 +36,7 @@ export function Challenge({
   onDismissed,
 }: Props): ReactNode {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
 
   // Syncs with the browser's top layer. A modal dialog is drawn above the whole page, so
   // a transform or an overflow on one of the host's elements around our container cannot
@@ -56,7 +57,11 @@ export function Challenge({
     const expectedOrigin = new URL(actionUrl).origin;
 
     const onMessage = (event: MessageEvent): void => {
-      if (event.origin !== expectedOrigin) return;
+      // Origin alone would also let another window of the provider's site, or a second
+      // copy of this widget, finish someone else's challenge.
+      if (event.origin !== expectedOrigin || event.source !== frameRef.current?.contentWindow) {
+        return;
+      }
 
       const result = ChallengeResultSchema.safeParse(event.data);
       if (!result.success || result.data.intentId !== intentId) return;
@@ -83,7 +88,16 @@ export function Challenge({
       <div className="challenge">
         <h2 className="heading">{labels.challengeTitle}</h2>
         <p className="status">{labels.challengeHint}</p>
-        <iframe className="challenge-frame" src={actionUrl} title={labels.challengeTitle} />
+        {/* The bank's page needs scripts, its form and its own origin for postMessage. It
+            does not need to navigate the merchant's page away, which sandbox takes from it. */}
+        <iframe
+          ref={frameRef}
+          className="challenge-frame"
+          src={actionUrl}
+          title={labels.challengeTitle}
+          sandbox="allow-scripts allow-forms allow-same-origin"
+          referrerPolicy="no-referrer"
+        />
         <div className="actions">
           <Button hostTag={hostButtonTag} variant="secondary" onClick={onFinished}>
             {labels.challengeDone}

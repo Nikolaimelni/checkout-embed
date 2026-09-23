@@ -107,17 +107,49 @@ describe('the challenge', () => {
     expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-dismissed' });
   });
 
-  it('acts on a message from the provider origin', () => {
+  const frameWindow = () =>
+    (screen.getByTitle(/confirm this payment/i) as HTMLIFrameElement).contentWindow;
+
+  it('sandboxes the provider page so it cannot navigate the merchant page away', () => {
+    show(states.requires_action);
+
+    const frame = screen.getByTitle(/confirm this payment/i);
+
+    expect(frame.getAttribute('sandbox')?.split(' ').sort()).toEqual([
+      'allow-forms',
+      'allow-same-origin',
+      'allow-scripts',
+    ]);
+    expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer');
+  });
+
+  it('acts on a message from the challenge frame', () => {
     const onIntent = show(states.requires_action);
+    expect(frameWindow()).not.toBeNull();
 
     window.dispatchEvent(
       new MessageEvent('message', {
         origin: new URL(CHALLENGE_URL).origin,
+        source: frameWindow(),
         data: { source: 'checkout-embed-3ds', intentId: 'pi_1', approved: true },
       }),
     );
 
     expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-finished' });
+  });
+
+  it('ignores the right origin speaking from a window that is not the challenge frame', () => {
+    const onIntent = show(states.requires_action);
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: new URL(CHALLENGE_URL).origin,
+        source: window,
+        data: { source: 'checkout-embed-3ds', intentId: 'pi_1', approved: true },
+      }),
+    );
+
+    expect(onIntent).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -140,7 +172,7 @@ describe('the challenge', () => {
   ])('ignores a message from %s', (_label, origin, data) => {
     const onIntent = show(states.requires_action);
 
-    window.dispatchEvent(new MessageEvent('message', { origin, data }));
+    window.dispatchEvent(new MessageEvent('message', { origin, data, source: frameWindow() }));
 
     expect(onIntent).not.toHaveBeenCalled();
   });
