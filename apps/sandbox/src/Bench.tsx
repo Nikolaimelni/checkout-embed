@@ -32,7 +32,12 @@ export function Bench() {
   useEffect(() => {
     if (!host) return;
 
-    const driver = createDriver({ methods: METHODS, outcome, challengeUrl: CHALLENGE_URL });
+    const driver = createDriver({
+      methods: METHODS,
+      total: TOTAL,
+      outcome,
+      challengeUrl: CHALLENGE_URL,
+    });
 
     const view = mountWidget(host, {
       store: driver,
@@ -47,9 +52,12 @@ export function Bench() {
       },
     });
 
-    driver.open();
+    driver.start();
 
-    return () => view.unmount();
+    return () => {
+      driver.dispose();
+      view.unmount();
+    };
   }, [host, outcome]);
 
   // Syncs React with document.head, which is where a host page's stylesheet lives.

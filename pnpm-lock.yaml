@@ -158,6 +158,9 @@ importers:
       '@checkout-embed/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@checkout-embed/sdk':
+        specifier: workspace:^
+        version: link:../../packages/sdk
       '@checkout-embed/widget':
         specifier: workspace:^
         version: link:../../packages/widget

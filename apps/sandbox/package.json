@@ -17,6 +17,7 @@
   "dependencies": {
     "@checkout-embed/contracts": "workspace:^",
     "@checkout-embed/core": "workspace:^",
+    "@checkout-embed/sdk": "workspace:^",
     "@checkout-embed/widget": "workspace:^",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

@@ -1,15 +1,18 @@
 import {
+  MerchantKeySchema,
+  type Money,
   type PaymentIntent,
   PaymentIntentSchema,
+  type PaymentIntentStatus,
   type PaymentMethod,
+  type PaymentMethodId,
 } from '@checkout-embed/contracts';
+import { createEventBus } from '@checkout-embed/core';
 import {
-  type CheckoutAction,
-  type CheckoutState,
-  createCheckoutReducer,
-  INITIAL_STATE,
-} from '@checkout-embed/core';
-import type { WidgetIntent, WidgetStore } from '@checkout-embed/widget';
+  type CheckoutApi,
+  type CheckoutController,
+  createCheckoutController,
+} from '@checkout-embed/sdk';
 
 export const OUTCOMES = ['succeed', 'decline', 'require_action'] as const;
 
@@ -17,121 +20,102 @@ export type Outcome = (typeof OUTCOMES)[number];
 
 export type DriverOptions = {
   readonly methods: readonly PaymentMethod[];
+  readonly total: Money;
   readonly outcome: Outcome;
   readonly challengeUrl: string;
-  /** How long the fake provider takes to answer. Zero makes the tests instant. */
+  /** How long the fake provider takes to answer, and the poll interval. */
   readonly latencyMs?: number;
-  readonly schedule?: (run: () => void, delayMs: number) => void;
 };
 
-export type Driver = WidgetStore & {
-  handle(intent: WidgetIntent): void;
-  /** Loads the method list, the way the SDK would after resolving its config. */
-  open(): void;
-};
+export type Driver = CheckoutController;
 
-const intentFor = (methodId: string): PaymentIntent =>
-  PaymentIntentSchema.parse({
-    id: 'pi_sandbox',
-    status: 'requires_confirmation',
-    money: { amountMinor: 1000, currency: 'EUR' },
-    methodId,
-    createdAt: new Date().toISOString(),
-  });
+const SANDBOX_KEY = MerchantKeySchema.parse('mk_sandbox');
+
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * The sandbox stands in for the SDK: same reducer, same widget, no network. It exists so
- * that every screen can be reached by clicking, and so a change to the machine shows up
- * as a broken bench rather than as a surprise in week five.
+ * A provider that lives in memory and answers like the mock one: confirm picks the outcome,
+ * a finished challenge goes through processing, and a read reports where the intent is.
  */
-export function createDriver(options: DriverOptions): Driver {
+function createSandboxProvider(options: DriverOptions) {
   const latencyMs = options.latencyMs ?? 500;
-  const schedule = options.schedule ?? ((run, delay) => setTimeout(run, delay));
-  const reduce = createCheckoutReducer();
-  const listeners = new Set<() => void>();
+  let status: PaymentIntentStatus = 'requires_confirmation';
+  let methodId: PaymentMethodId | null = null;
 
-  let state: CheckoutState = INITIAL_STATE;
+  const current = (): PaymentIntent =>
+    PaymentIntentSchema.parse({
+      id: 'pi_sandbox',
+      status,
+      money: options.total,
+      methodId,
+      createdAt: new Date().toISOString(),
+      actionUrl: status === 'requires_action' ? options.challengeUrl : null,
+    });
 
-  const dispatch = (action: CheckoutAction): void => {
-    const next = reduce(state, action);
-    if (next === state) return;
-
-    state = next;
-    for (const listener of listeners) listener();
-  };
-
-  const later = (action: CheckoutAction): void => schedule(() => dispatch(action), latencyMs);
-
-  return {
-    getState: () => state,
-
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
+  const api: CheckoutApi = {
+    async loadConfig() {
+      await pause(latencyMs);
+      return {
+        bundleUrl: 'https://sandbox.invalid/bundle.js',
+        protocolVersion: 1,
+        methods: [...options.methods],
       };
     },
 
-    open() {
-      dispatch({ type: 'methods/loaded', methods: options.methods });
+    async createIntent(input) {
+      await pause(latencyMs);
+      status = 'requires_confirmation';
+      methodId = input.methodId;
+      return current();
     },
 
+    async confirmIntent() {
+      await pause(latencyMs);
+      status =
+        options.outcome === 'decline'
+          ? 'failed'
+          : options.outcome === 'require_action'
+            ? 'requires_action'
+            : 'processing';
+      return current();
+    },
+
+    async readIntent() {
+      await pause(latencyMs);
+      if (status === 'processing') status = 'succeeded';
+      return current();
+    },
+  };
+
+  return {
+    api,
+    finishChallenge() {
+      if (status === 'requires_action') status = 'processing';
+    },
+  };
+}
+
+/**
+ * The SDK's own controller against a provider in memory, so the bench shows what a merchant
+ * gets, retries and Close included, without a network.
+ */
+export function createDriver(options: DriverOptions): Driver {
+  const provider = createSandboxProvider(options);
+  const controller = createCheckoutController({
+    api: provider.api,
+    merchantKey: SANDBOX_KEY,
+    total: options.total,
+    events: createEventBus(),
+    pollIntervalMs: options.latencyMs ?? 500,
+  });
+
+  return {
+    ...controller,
     handle(intent) {
-      switch (intent.type) {
-        case 'select-method':
-          dispatch({ type: 'method/selected', methodId: intent.methodId });
-          return;
-
-        case 'go-back':
-          dispatch({ type: 'details/dismissed' });
-          return;
-
-        case 'pay': {
-          if (state.status !== 'details') return;
-          dispatch({ type: 'intent/created', intent: intentFor(state.method.id) });
-
-          if (options.outcome === 'require_action') {
-            later({ type: 'action/required', actionUrl: options.challengeUrl });
-            return;
-          }
-
-          later(
-            options.outcome === 'decline'
-              ? {
-                  type: 'payment/failed',
-                  failure: { code: 'declined', message: 'The bank said no.' },
-                  retryable: true,
-                }
-              : { type: 'payment/succeeded', intent: intentFor(state.method.id) },
-          );
-          return;
-        }
-
-        case 'challenge-finished': {
-          if (state.status !== 'requires_action') return;
-          const settled = state.intent;
-          dispatch({ type: 'poll/started' });
-          later({ type: 'payment/succeeded', intent: settled });
-          return;
-        }
-
-        case 'challenge-dismissed':
-          if (state.status !== 'requires_action') return;
-          dispatch({
-            type: 'payment/failed',
-            failure: { code: 'action_abandoned', message: 'The bank check was closed.' },
-            retryable: true,
-          });
-          return;
-
-        case 'retry':
-          dispatch({ type: 'checkout/retried' });
-          return;
-
-        case 'dismiss':
-          dispatch({ type: 'checkout/reset' });
-          dispatch({ type: 'methods/loaded', methods: options.methods });
-      }
+      // The provider's page would have recorded the answer itself. Here the click is all
+      // there is.
+      if (intent.type === 'challenge-finished') provider.finishChallenge();
+      controller.handle(intent);
     },
   };
 }
