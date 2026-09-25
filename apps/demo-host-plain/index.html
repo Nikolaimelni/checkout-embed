@@ -68,7 +68,7 @@
     </main>
 
     <!--
-      Not async on purpose. The loader is 1.6 kB, so blocking on it costs less than a
+      Not async. The loader is 1.6 kB, so blocking on it costs less than a
       round trip, and it buys the next script a global that is guaranteed to exist.
       The bundle it fetches is the asynchronous part, which is what the queue is for.
     -->

@@ -35,8 +35,7 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
 
       const { intent, replayed } = await service.create(body, idempotencyKeyOf(response));
 
-      // 201 the first time, 200 on a replay. A merchant retrying after a dropped connection
-      // can tell the two apart without parsing anything.
+      // 201 the first time, 200 on a replay.
       response.status(replayed ? 200 : 201).json(intent);
     },
   );

@@ -3,15 +3,7 @@ import { boolean, literal, object, string } from 'zod';
 import { Button } from './HostElement.js';
 import type { Labels } from './labels.js';
 
-/**
- * What the mock provider's challenge page posts when somebody finishes with it. A real
- * provider defines its own shape and an integration adapts to that one; the important
- * part is that whatever arrives is checked against a schema and an origin before it is
- * allowed to move a payment along.
- *
- * It is a hint either way. The status still comes from polling the provider, because a
- * message from an iframe is not a receipt.
- */
+/** What the mock's challenge page posts when it is done. A hint only: polling decides. */
 const ChallengeResultSchema = object({
   source: literal('checkout-embed-3ds'),
   intentId: string().min(1),
@@ -38,10 +30,8 @@ export function Challenge({
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
-  // Syncs with the browser's top layer. A modal dialog is drawn above the whole page, so
-  // a transform or an overflow on one of the host's elements around our container cannot
-  // clip it the way it clips position: fixed. Focus goes to the dialog itself, which gets
-  // its label read out before the iframe takes over.
+  // Syncs with the top layer: a modal dialog is not clipped by transforms or overflow in the
+  // host page, and focus lands on the labelled dialog first.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -51,8 +41,7 @@ export function Challenge({
     return () => dialog.close();
   }, []);
 
-  // Syncs with the challenge iframe, a document on the provider's origin that posts a
-  // message when somebody finishes with it.
+  // Syncs with the challenge iframe's postMessage.
   useEffect(() => {
     const expectedOrigin = new URL(actionUrl).origin;
 

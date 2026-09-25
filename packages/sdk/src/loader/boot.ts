@@ -1,9 +1,5 @@
-/**
- * Everything in this file ships in the tag a merchant pastes into their page, so it has
- * no imports at all. Not from contracts, not from core, nothing that drags a validator in
- * behind it. The protocol version below is a copy of the one in contracts; a test keeps
- * the two honest.
- */
+/** Ships in the merchant's tag, so it imports nothing that could pull in a validator. The
+ * protocol version is a copy, and a test checks it against contracts. */
 export const LOADER_PROTOCOL_VERSION = 1;
 
 export const DEFAULT_GLOBAL_NAME = 'checkoutEmbed';
@@ -21,22 +17,16 @@ export type LoaderConfig = {
   readonly nonce: string | null;
 };
 
-/**
- * The stub a merchant calls before the real bundle has arrived. Calls pile up on `q` and
- * the runtime replays them in order; `v` is what lets the runtime notice that this loader
- * was cached six months ago and refuse to guess what its calls meant.
- */
+/** Calls queue on `q` until the bundle replays them. `v` lets the bundle refuse a queue
+ * from an older loader. */
 export type QueueStub = {
   (...args: unknown[]): void;
   q?: unknown[][];
   v?: number;
 };
 
-/**
- * The global a merchant's tag installs is looked up by a name from an attribute, so it
- * cannot be a declared property. These two keep that dynamic access in one place instead
- * of widening Window with an index signature, which would swallow console and fetch too.
- */
+/** The global is named by an attribute, so access to it goes through these two instead of
+ * an index signature on Window. */
 export function readSlot(view: Window, name: string): unknown {
   return (view as unknown as Record<string, unknown>)[name];
 }
@@ -100,10 +90,7 @@ export function readConfig(script: HTMLScriptElement, pageOrigin: string): Loade
   };
 }
 
-/**
- * Idempotent. A merchant who pastes the tag into both the layout and the checkout page
- * gets one queue, not two, and whatever they already pushed into it survives.
- */
+/** Idempotent: a tag pasted twice keeps one queue and whatever is already in it. */
 export function installQueue(view: Window, globalName: string): QueueStub {
   const existing = readSlot(view, globalName) as QueueStub | undefined;
 

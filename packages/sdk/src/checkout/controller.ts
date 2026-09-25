@@ -51,11 +51,8 @@ export type CheckoutController = WidgetStore & {
   dispose(): void;
 };
 
-/**
- * One attempt to pay. The key and the intent outlive a failure that came without an
- * answer, so a retry can ask the provider what became of the payment instead of making a
- * second one.
- */
+/** One attempt to pay. Its key and intent outlive a failure that came with no answer, so a
+ * retry asks the provider before paying again. */
 type Attempt = {
   readonly key: string;
   readonly methodId: PaymentMethodId;
@@ -65,11 +62,7 @@ type Attempt = {
   busy: boolean;
 };
 
-/**
- * The other half of the widget. The widget knows what somebody clicked; this knows what
- * that costs in HTTP calls, and the reducer in core knows which screen the answer leads
- * to. None of the three knows the other two's business.
- */
+/** Turns what the widget reports into HTTP calls, and the answers into reducer actions. */
 export function createCheckoutController(options: ControllerOptions): CheckoutController {
   const { api, events, merchantKey, total } = options;
   const logger = options.logger ?? silentLogger;
@@ -141,11 +134,8 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     });
   }
 
-  /**
-   * The same key while the customer stays on the same method, so a replay gets back the
-   * intent the provider already has. Another method is another request body, which the
-   * provider refuses under the old key, so it starts a new attempt.
-   */
+  /** The same method keeps its key, so a replay returns the same intent. Another method is
+   * another request body, which needs a key of its own. */
   function attemptFor(methodId: PaymentMethodId): Attempt {
     const kept = attempt?.methodId === methodId ? attempt : null;
     attempt = {
@@ -198,8 +188,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           return;
         }
 
-        // The reducer gives up on its own once the budget is spent, which lands the
-        // machine somewhere other than polling and ends this loop.
+        // The reducer fails the payment once the poll budget is spent, which ends this loop.
         if (dispatch({ type: 'poll/tick', intent }) && state.status === 'polling') schedule();
       });
     };
@@ -259,11 +248,8 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     }
   }
 
-  /**
-   * An intent left behind by an earlier attempt may still settle. Paying with another
-   * method opens a new intent, so the old one is checked first, and if it is still going
-   * somewhere the screen follows it instead of charging the customer twice.
-   */
+  /** Checks an intent an earlier attempt left behind. True when the screen now follows it,
+   * or when the customer moved on while it was being read. */
   async function resumed(intentId: PaymentIntentId, current: Attempt): Promise<boolean> {
     const intent = await api.readIntent(intentId, current.abort.signal);
     if (current.abort.signal.aborted) return true;
@@ -294,8 +280,8 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
         if (current.abort.signal.aborted) return;
         current.intentId = created.id;
 
-        // False when Back, a reset or a teardown got here first. Nothing is confirmed yet,
-        // so stopping leaves an intent that nobody will ever charge.
+        // False when Back, a reset or a teardown got here first. An unconfirmed intent is never
+        // charged.
         if (!dispatch({ type: 'intent/created', intent: created })) return;
 
         // A replayed key can hand back an intent that was confirmed last time round.
@@ -324,14 +310,13 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
     const intentId = pending?.intentId ?? null;
     if (pending === null || intentId === null || !reopen(pending.methodId)) {
-      // The list may be stale, or empty because loading it is what failed. A kept attempt
-      // without an intent still carries its key, so the next Pay replays it.
+      // The list may be stale, or empty if loading it failed. A kept attempt with no intent
+      // replays its key on the next Pay.
       loadMethods();
       return;
     }
 
-    // The confirm may have gone through even though its answer never arrived, so the
-    // provider is asked what became of the intent before anything can be charged again.
+    // The confirm may have landed without an answer, so ask before charging again.
     const resumed = attemptFor(pending.methodId);
     resumed.busy = true;
 
@@ -389,8 +374,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
         case 'challenge-dismissed':
           if (state.status !== 'requires_action') return;
-          // The intent stays open at the provider and the attempt keeps it, so Try again
-          // reads it back and reopens the same challenge instead of paying twice.
+          // The attempt keeps the open intent, so Try again reopens the same challenge.
           dispatch({
             type: 'payment/failed',
             failure: {
@@ -406,8 +390,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           return;
 
         case 'dismiss':
-          // The attempt survives Close. A payment that timed out or lost its challenge can
-          // still settle, and the next Pay has to find it rather than open a second one.
+          // Close keeps the attempt: a payment that timed out or lost its challenge can still settle.
           abandonRequests();
           stopPolling();
           if (dispatch({ type: 'checkout/reset' })) loadMethods();

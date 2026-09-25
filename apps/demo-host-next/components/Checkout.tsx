@@ -10,14 +10,10 @@ type Props = {
   readonly apiBaseUrl: string;
 };
 
-/**
- * The whole point of this app. The widget owns a shadow root and a React root of its own,
- * neither of which Next knows about, so the cleanup below is the only thing standing
- * between a client side navigation and a widget that outlives its page.
- */
+// Next knows nothing about the widget's shadow root or its React root, so the cleanup
+// below is what takes it out on client navigation.
 export function Checkout({ amount, apiBaseUrl }: Props) {
-  // State rather than a ref: the effect has to run again if React hands it a different
-  // node, and a ref would not tell it.
+  // State, not a ref, so the effect runs again when React hands it a different node.
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const router = useRouter();
 
@@ -37,8 +33,7 @@ export function Checkout({ amount, apiBaseUrl }: Props) {
     return () => {
       stopListening();
       mounted.unmount();
-      // Deliberately not terminate(). The instance is shared per merchant key, and this
-      // component has no business ending it for anyone else on the page.
+      // Not terminate(): the instance is shared by everyone using this merchant key.
     };
   }, [host, amount, apiBaseUrl, router]);
 

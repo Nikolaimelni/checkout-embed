@@ -38,18 +38,13 @@ function page(title: string, body: string, script = ''): string {
 </html>`;
 }
 
-/**
- * The page a real provider would serve inside the 3DS iframe. It posts a result to the
- * opener so the widget can react without waiting for its next poll; the poll is still the
- * source of truth, because a message from an iframe is a hint and not a receipt.
- */
+/** The page inside the 3DS iframe. Its postMessage only saves the widget a poll. */
 export function threeDsRouter(service: PaymentsService): Router {
   const router = Router();
 
   router.use((_request, response, next) => {
-    // This page exists to be framed by a merchant. The service-wide headers say the
-    // opposite, so they are replaced here rather than loosened everywhere. A real provider
-    // would name the origins registered against the merchant key instead of allowing all.
+    // Framed by merchant pages, so the service-wide headers are replaced here. A real
+    // provider would list the merchant's origins instead of *.
     response.removeHeader('X-Frame-Options');
     response.setHeader(
       'Content-Security-Policy',
@@ -86,8 +81,7 @@ export function threeDsRouter(service: PaymentsService): Router {
 
       const intent = await service.completeChallenge(params.id, approved);
 
-      // The target origin is '*' because a mock provider does not know the merchant's
-      // domains. A real one pins it to the origins registered against the merchant key.
+      // '*' because the mock does not know merchant domains. A real provider pins it.
       const message = JSON.stringify({
         source: 'checkout-embed-3ds',
         intentId: intent.id,

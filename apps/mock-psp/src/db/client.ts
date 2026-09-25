@@ -14,11 +14,7 @@ export type DatabaseHandle = {
   readonly close: () => void;
 };
 
-/**
- * node:sqlite through drizzle's proxy driver rather than better-sqlite3. There is no
- * native module to build, which is the difference between an install that works on
- * Windows, Linux and CI without a compiler and one that does not.
- */
+/** node:sqlite behind drizzle's proxy driver: no native module to compile on Windows or CI. */
 export function createDatabase(url: string): DatabaseHandle {
   if (url !== ':memory:') mkdirSync(dirname(url), { recursive: true });
 
@@ -35,9 +31,8 @@ export function createDatabase(url: string): DatabaseHandle {
         return { rows: [] };
       }
 
-      // The proxy protocol wants positional rows. node:sqlite hands back objects keyed by
-      // column name in select order, so Object.values is the conversion. It would lose a
-      // duplicated column name in a join, and there are no joins here.
+      // The proxy wants positional rows and node:sqlite returns objects. Object.values would
+      // lose a duplicated column name in a join; there are no joins.
       const toValues = (row: unknown): unknown[] => Object.values(row as object);
 
       if (method === 'get') {

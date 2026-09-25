@@ -12,11 +12,7 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, where: string): T
   });
 }
 
-/**
- * Express 5 makes req.params and req.query getters, so the parsed values go on res.locals
- * rather than being written back over the request. Handlers read them from there and never
- * touch the raw ones.
- */
+/** Express 5 makes req.params and req.query getters, so parsed values go on res.locals. */
 export type Validated<TBody = unknown, TParams = unknown, TQuery = unknown> = {
   body: TBody;
   params: TParams;
@@ -51,11 +47,7 @@ export function validate(schemas: ValidationSchemas): RequestHandler {
   };
 }
 
-/**
- * The mock accepts any non-empty bearer token. A real provider would verify it; the point
- * of asking for one is that the integration has to carry it, which is where merchants
- * actually get stuck.
- */
+/** Any non-empty token passes. The mock only checks that the integration sends one. */
 export function requireBearer(request: Request): string {
   const header = request.get('authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';

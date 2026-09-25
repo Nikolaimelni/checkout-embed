@@ -6,10 +6,7 @@ function ownerWindow(root: ShadowRoot): StyleWindow {
   return (root.ownerDocument.defaultView ?? globalThis) as StyleWindow;
 }
 
-/**
- * jsdom has no constructable stylesheets and Safari had none until 16.4, so the fallback
- * is not a nicety. It is the branch every component test in this package runs through.
- */
+/** jsdom and Safari before 16.4 have no constructable sheets, so the fallback is a real path. */
 export function supportsConstructableStyleSheets(view: StyleWindow): boolean {
   return (
     typeof view.CSSStyleSheet === 'function' &&
@@ -18,10 +15,7 @@ export function supportsConstructableStyleSheets(view: StyleWindow): boolean {
   );
 }
 
-/**
- * One sheet per window per stylesheet, shared by every root that adopts it, so the CSS is
- * parsed once however many widgets are on the page.
- */
+/** One sheet per window and stylesheet, shared by every root that adopts it. */
 const sheets = new WeakMap<StyleWindow, Map<string, CSSStyleSheet>>();
 
 function sheetFor(view: StyleWindow, css: string): CSSStyleSheet {

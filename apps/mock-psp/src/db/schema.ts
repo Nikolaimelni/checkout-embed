@@ -1,9 +1,6 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-/**
- * Timestamps are epoch milliseconds. SQLite has no date type, and a number that means one
- * thing everywhere beats a string that means three things depending on who wrote it.
- */
+/** Timestamps are epoch milliseconds. SQLite has no date type. */
 export const paymentIntents = sqliteTable('payment_intents', {
   id: text('id').primaryKey(),
   merchantKey: text('merchant_key').notNull(),
@@ -20,10 +17,7 @@ export const paymentIntents = sqliteTable('payment_intents', {
   updatedAt: integer('updated_at').notNull(),
 });
 
-/**
- * Scoped by merchant, because two merchants picking the same key is their business and
- * not a collision. Real providers scope these per account for the same reason.
- */
+/** Scoped per merchant, the way real providers scope them per account. */
 export const idempotencyKeys = sqliteTable(
   'idempotency_keys',
   {

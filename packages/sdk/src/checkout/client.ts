@@ -16,10 +16,7 @@ import {
 } from '@checkout-embed/core';
 import type { z } from 'zod';
 
-/**
- * Every call takes the signal that ends it. A customer pressing Back, or a widget torn down
- * mid-payment, must not leave a request behind that goes on to confirm a charge.
- */
+/** Every call takes a signal, so Back or a teardown cannot leave a confirm in flight. */
 export type CheckoutApi = {
   loadConfig(merchantKey: MerchantKey, signal?: AbortLike): Promise<RemoteWidgetConfig>;
   createIntent(
@@ -51,10 +48,7 @@ function messageOf(response: HttpResponse): string {
     : `The payment provider answered ${response.status}.`;
 }
 
-/**
- * Status codes translated once, here, so that everything above this line reasons about a
- * code and a retryable flag rather than about HTTP.
- */
+/** HTTP statuses become a code and a retryable flag here, and nowhere else. */
 function raise(response: HttpResponse): never {
   const message = messageOf(response);
 
@@ -62,7 +56,7 @@ function raise(response: HttpResponse): never {
     throw new CheckoutError('invalid_config', message);
   }
 
-  // Too many requests is the provider asking us to slow down, not an answer about the payment.
+  // 429 is backpressure, not an answer about the payment.
   if (response.status === 429 || response.status >= 500) {
     throw new CheckoutError('network', message, { retryable: true });
   }
@@ -74,8 +68,7 @@ function parse<T>(schema: z.ZodType<T>, response: HttpResponse): T {
   const parsed = schema.safeParse(response.body);
 
   if (!parsed.success) {
-    // Not a decline and not an outage: the provider answered something this version of the
-    // SDK cannot read. Saying so beats rendering a screen built from undefined.
+    // The provider answered in a shape this SDK version cannot read.
     throw new CheckoutError(
       'invalid_message',
       'The payment provider answered in a shape this version does not understand.',

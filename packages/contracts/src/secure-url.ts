@@ -18,11 +18,7 @@ export function isSecureUrl(value: string): boolean {
   }
 }
 
-/**
- * For addresses the provider hands back and the widget then loads: the bundle and the 3DS
- * page. A plain url() lets data: and http: through, and either one ends up running on the
- * merchant's page.
- */
+/** For what the widget loads from a provider answer. url() alone lets data: and http: in. */
 export const SecureUrlSchema = url().refine(isSecureUrl, {
   error: 'expected an https address, or http on localhost',
 });

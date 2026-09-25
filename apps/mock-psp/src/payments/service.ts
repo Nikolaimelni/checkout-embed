@@ -23,10 +23,7 @@ export type PaymentsService = {
   settleDue(): Promise<number>;
 };
 
-/**
- * Everything the HTTP layer hands back goes through the published schema on the way out,
- * so a column added to the table cannot leak into the API by accident.
- */
+/** Out through the published schema, so a new column cannot leak into the API. */
 function toDto(row: IntentRow): PaymentIntent {
   return PaymentIntentSchema.parse({
     id: row.id,

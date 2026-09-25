@@ -78,11 +78,7 @@ function tearDown(mounted: Mounted): void {
 
 const EMPTY_HOST: HostState = { balance: null, limits: null, blockingMessage: null };
 
-/**
- * One instance per merchant key, shared by everyone who asks for it. Two components on the
- * same page both calling init is the normal case, and each getting its own event bus and
- * its own token fetch is not what either of them meant.
- */
+/** One instance per merchant key: two components calling init share a bus and a token. */
 const instances = new Map<MerchantKey, CheckoutInstance>();
 
 function resolveTarget(view: Window, target: Element | string): Element {
@@ -96,17 +92,13 @@ function resolveTarget(view: Window, target: Element | string): Element {
   return found;
 }
 
-/**
- * One method list per instance. Without this every mount, and every Close, asked the
- * provider again for the same answer. A failed load is dropped so Try again really retries.
- */
+/** One method list per instance. A failed load is not kept, so Try again asks again. */
 function cachingConfig(api: CheckoutApi): CheckoutApi {
   let config: Promise<RemoteWidgetConfig> | null = null;
 
   return {
     ...api,
-    // No signal: the request is shared, and one widget going away must not cancel it for
-    // the others waiting on it.
+    // No signal: the request is shared, and one unmount must not cancel it for the rest.
     loadConfig(merchantKey) {
       config ??= api.loadConfig(merchantKey).catch((cause: unknown) => {
         config = null;
@@ -192,9 +184,8 @@ export function init(options: CheckoutOptions): CheckoutInstance {
         ...(mountOptions.labels ? { labels: mountOptions.labels } : {}),
       };
 
-      // A second mount into the same element is the same widget with a new controller:
-      // mountWidget renders into the root it already has, and the old controller is stopped
-      // here rather than left loading and polling behind a view that no longer reads it.
+      // The same element again keeps its view and gets a new controller. The old one stops
+      // here instead of polling behind a view that no longer reads it.
       const previous = mounts.get(element);
       const mounted: Mounted = { view: mountWidget(element, input), controller, input };
       previous?.controller.dispose();
@@ -215,9 +206,7 @@ export function init(options: CheckoutOptions): CheckoutInstance {
     update(patch) {
       refuseIfTerminated();
 
-      // A patch: whatever it leaves out keeps its current value. Validated on the way in
-      // even though it never leaves the process, because a limit that arrived as a string
-      // would disable the pay button for reasons nobody could explain.
+      // A patch, validated even in-process: a limit passed as a string would disable Pay.
       const parsed = HostMessageSchema.safeParse({ type: 'host/update', ...host, ...patch });
 
       if (!parsed.success || parsed.data.type !== 'host/update') {

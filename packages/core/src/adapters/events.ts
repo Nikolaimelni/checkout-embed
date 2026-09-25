@@ -29,14 +29,12 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
       const registered = listeners.get(event.type);
       if (!registered) return;
 
-      // Iterate a copy: a listener is allowed to unsubscribe itself, and mutating the set
-      // mid-iteration would silently skip whoever came after it.
+      // A copy, so a listener can unsubscribe itself without skipping the next one.
       for (const listener of [...registered]) {
         try {
           listener(event);
         } catch (cause) {
-          // A merchant's callback throwing is their bug, not a reason to abandon the
-          // payment. Swallowed on purpose, reported so it is not invisible.
+          // A merchant's listener throwing is no reason to abandon the payment.
           logger.log('error', 'checkout: event listener threw', { event: event.type, cause });
         }
       }
@@ -52,8 +50,8 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
 
       return () => {
         registered.delete(erased);
-        // A second call, or one after clear(), holds a set that is no longer in the map,
-        // and deleting by type would drop whoever subscribed since.
+        // After a second call or clear() this set is stale, and deleting by type would drop
+        // whoever subscribed since.
         if (registered.size === 0 && listeners.get(type) === registered) listeners.delete(type);
       };
     },

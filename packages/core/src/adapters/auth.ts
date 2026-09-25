@@ -3,10 +3,7 @@ export type TokenRequest = {
   readonly forceRefresh?: boolean;
 };
 
-/**
- * The merchant owns authentication. We ask for a token and never store one, which is why
- * this is a callback rather than a field on the config.
- */
+/** The merchant owns authentication. We ask for a token per request and keep none. */
 export type AuthAdapter = {
   getToken(request?: TokenRequest): Promise<string>;
 };

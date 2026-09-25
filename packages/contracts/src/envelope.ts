@@ -28,10 +28,7 @@ export type SealOptions = {
   readonly sentAt: string;
 };
 
-/**
- * Takes the id and the timestamp rather than making them, so this stays a pure function
- * and the caller owns the clock.
- */
+/** The caller supplies the id and the clock, so this stays pure. */
 export function sealEnvelope<TPayload>(
   payload: TPayload,
   { id, sentAt }: SealOptions,
@@ -55,11 +52,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/**
- * The order of the three checks is the whole point. Source first, so foreign traffic is
- * dropped in silence; version second, so a stale loader is refused rather than
- * misinterpreted; shape last, because it is only meaningful once the first two hold.
- */
+/** Source, version, shape, in that order: foreign traffic is dropped silently, and a stale
+ * loader is refused before its payload is read. */
 export function readEnvelope<TPayload>(
   payloadSchema: z.ZodType<TPayload>,
   raw: unknown,

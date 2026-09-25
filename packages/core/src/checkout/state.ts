@@ -15,11 +15,7 @@ export type CheckoutStatus =
   | 'succeeded'
   | 'failed';
 
-/**
- * Every state carries exactly what its screen needs and nothing else, so an impossible
- * render is a type error rather than a runtime undefined. The method list survives into
- * failed because a retry has to land back on a list the user already saw.
- */
+/** Each state carries only what its screen needs. failed keeps the methods for a retry. */
 export type CheckoutState =
   | { readonly status: 'idle' }
   | { readonly status: 'methods'; readonly methods: readonly PaymentMethod[] }

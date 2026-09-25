@@ -11,10 +11,7 @@ function digest(payload: string, secret: string, timestamp: number): string {
   return createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');
 }
 
-/**
- * The timestamp is inside the signed string, not just next to it. Without that, a captured
- * delivery can be replayed forever and the signature still checks out.
- */
+/** The timestamp is signed too, or a captured delivery could be replayed forever. */
 export function signPayload(payload: string, secret: string, timestampSeconds: number): string {
   return `t=${timestampSeconds},v1=${digest(payload, secret, timestampSeconds)}`;
 }
@@ -55,7 +52,6 @@ export function verifySignature(
   const expected = Buffer.from(digest(payload, secret, parsed.timestamp), 'utf8');
   const received = Buffer.from(parsed.v1, 'utf8');
 
-  // Length has to match before timingSafeEqual will look at the bytes, and comparing
-  // lengths first leaks nothing an attacker cannot already count.
+  // timingSafeEqual needs equal lengths, and the length gives nothing away.
   return expected.length === received.length && timingSafeEqual(expected, received);
 }

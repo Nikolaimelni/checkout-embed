@@ -4,21 +4,14 @@ function isDefined(name: string): boolean {
   return typeof customElements !== 'undefined' && customElements.get(name) !== undefined;
 }
 
-/**
- * Returns the tag name once the host has actually registered it, and null until then. A
- * merchant on a lazily hydrated page registers their components after our script runs
- * more often than before it, so a single synchronous check would fall back forever.
- *
- * The name arrives from a parsed config, which is where it is checked against the rules
- * the custom element registry enforces by throwing.
- */
+/** The tag name once the host has registered it, null until then. Lazily hydrated pages
+ * register late, so this waits instead of checking once. */
 export function useHostElement(name: string | undefined): string | null {
   const [resolved, setResolved] = useState<string | null>(() =>
     name !== undefined && isDefined(name) ? name : null,
   );
 
-  // Syncs with the custom element registry, which lives outside React and can gain the
-  // tag at any moment.
+  // Syncs with the custom element registry, which can gain the tag at any moment.
   useEffect(() => {
     if (name === undefined) {
       setResolved(null);
@@ -67,9 +60,8 @@ export function Button({
     // union of literal element names for TypeScript to check it against.
     const Host = tag as unknown as ElementType;
 
-    // An absent attribute rather than disabled="false", which a custom element would read
-    // as disabled. The handler goes too: a custom element is not a form control, and the
-    // attribute alone would not stop a click on Pay for an amount outside the limits.
+    // No disabled="false", which a custom element reads as disabled, and no handler, since a
+    // custom element ignores the attribute when clicked.
     return (
       <Host
         className={className}

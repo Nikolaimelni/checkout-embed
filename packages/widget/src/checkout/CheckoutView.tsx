@@ -7,10 +7,7 @@ import type { WidgetIntent } from './intents.js';
 import { DEFAULT_LABELS, type Labels } from './labels.js';
 import { formatMoney } from './money.js';
 
-/**
- * What the merchant pushes in through instance.update(). Derived from the schema that
- * validates it rather than restated, so the two cannot drift.
- */
+/** What instance.update() pushes in, derived from the schema that validates it. */
 export type HostState = Omit<Extract<HostMessage, { type: 'host/update' }>, 'type'>;
 
 export type HostComponents = {

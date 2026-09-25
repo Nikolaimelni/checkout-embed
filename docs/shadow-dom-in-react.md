@@ -15,11 +15,11 @@ This is the one that stops you on day one, and it is the least interesting.
 
 CSS Modules, styled-jsx, Tailwind's generated sheet, and every other build-time styling
 approach put their output in `document.head`. A shadow root does not look at
-`document.head`. Not by design, not as a bug: style resolution inside a shadow tree
-consults that tree's own stylesheets and nothing else.
+`document.head`. Style resolution inside a shadow tree consults that tree's own stylesheets
+and nothing else.
 
-So the widget renders with its class names attached and no rules behind them. It looks
-like a styling bug and it is an architecture one.
+So the widget renders with its class names attached and no rules behind them, and the
+first hour goes into looking for a typo in a class name.
 
 The fix is to get the stylesheet into the shadow root as a string. I write SCSS and compile
 it into a generated TypeScript module before anything else runs:
@@ -29,7 +29,7 @@ const { css } = compile('src/styles/widget.scss', { style: 'compressed' });
 writeFileSync(target, `export const widgetCss = ${JSON.stringify(css)};`);
 ```
 
-A bundler plugin would do the same job with less ceremony, and I did not use one on purpose.
+A bundler plugin would do the same job with less ceremony, and I still did not use one.
 The same import has to work under the library build, under the test runner and under `tsc`,
 and a plugin means three different mechanisms answering for one import statement. A file on
 disk means one.

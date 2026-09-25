@@ -33,10 +33,7 @@ const SANDBOX_KEY = MerchantKeySchema.parse('mk_sandbox');
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/**
- * A provider that lives in memory and answers like the mock one: confirm picks the outcome,
- * a finished challenge goes through processing, and a read reports where the intent is.
- */
+/** An in-memory provider that answers the way the mock one does. */
 function createSandboxProvider(options: DriverOptions) {
   const latencyMs = options.latencyMs ?? 500;
   let status: PaymentIntentStatus = 'requires_confirmation';
@@ -95,10 +92,7 @@ function createSandboxProvider(options: DriverOptions) {
   };
 }
 
-/**
- * The SDK's own controller against a provider in memory, so the bench shows what a merchant
- * gets, retries and Close included, without a network.
- */
+/** The SDK's controller against that provider, so the bench behaves like the real widget. */
 export function createDriver(options: DriverOptions): Driver {
   const provider = createSandboxProvider(options);
   const controller = createCheckoutController({
@@ -112,8 +106,7 @@ export function createDriver(options: DriverOptions): Driver {
   return {
     ...controller,
     handle(intent) {
-      // The provider's page would have recorded the answer itself. Here the click is all
-      // there is.
+      // The provider's own page would record this. In the sandbox the click is all there is.
       if (intent.type === 'challenge-finished') provider.finishChallenge();
       controller.handle(intent);
     },

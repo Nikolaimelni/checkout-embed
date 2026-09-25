@@ -3,10 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createDriver, OUTCOMES, type Outcome } from './driver';
 import { CHALLENGE_URL, METHODS, TOTAL } from './fixtures';
 
-/**
- * Not a strawman. Resets and design systems in the wild really do reach for the universal
- * selector with !important, and this is the pressure the shadow root exists to take.
- */
+/** What real resets and design systems do: the universal selector with !important. */
 const HOSTILE_CSS = `
   * {
     color: #d40000 !important;
@@ -18,8 +15,7 @@ const HOSTILE_CSS = `
 `;
 
 export function Bench() {
-  // State rather than a ref: the container is a different element after the checkbox
-  // below removes and restores it, and an effect has to hear about that.
+  // State, not a ref: the container is a new element after the checkbox below removes it.
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const [outcome, setOutcome] = useState<Outcome>('succeed');
   const [hostile, setHostile] = useState(false);
@@ -27,8 +23,7 @@ export function Bench() {
   const [log, setLog] = useState<readonly { id: number; type: string }[]>([]);
   const nextEntryId = useRef(0);
 
-  // Syncs React with the widget, which owns a shadow root and a React root of its own and
-  // knows nothing about this component's lifecycle.
+  // Syncs with the widget, which has a shadow root and a React root of its own.
   useEffect(() => {
     if (!host) return;
 

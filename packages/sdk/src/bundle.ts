@@ -1,5 +1,4 @@
 import { bootstrap } from './runtime/drain.js';
 
-// The file the loader injects. Importing the package from npm gets index.ts instead, which
-// has no side effects and no opinion about a global.
+// What the loader injects. The npm entry is index.ts, which has no side effects.
 bootstrap();

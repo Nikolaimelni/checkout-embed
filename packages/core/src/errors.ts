@@ -25,10 +25,7 @@ export function isCheckoutError(value: unknown): value is CheckoutError {
   return value instanceof CheckoutError;
 }
 
-/**
- * Anything can be thrown in JavaScript and eventually everything is, so the boundary that
- * reports a failure to the host takes unknown rather than Error.
- */
+/** Takes unknown, since anything can be thrown. */
 export function toFailure(value: unknown): CheckoutFailure {
   if (isCheckoutError(value)) return value.toFailure();
   if (value instanceof Error) return { code: 'unknown', message: value.message || value.name };

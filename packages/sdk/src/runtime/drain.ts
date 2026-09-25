@@ -28,10 +28,8 @@ function isTarget(value: unknown): value is Element | string {
   return typeof value === 'string' || value instanceof Element;
 }
 
-/**
- * Turns queued arguments back into calls. Everything here arrives untyped from a page we
- * do not control, so each command checks what it was handed before using it.
- */
+/** Turns queued arguments back into calls. They come from a page we do not control, so
+ * each one is checked. */
 export function createCommandRunner(warn: (message: string) => void): CommandRunner {
   let current: CheckoutInstance | null = null;
 
@@ -88,15 +86,8 @@ export function createCommandRunner(warn: (message: string) => void): CommandRun
   };
 }
 
-/**
- * Replays whatever the merchant called before this bundle arrived, then replaces the stub
- * so later calls go straight through.
- *
- * The version check is the reason every queue carries one. A merchant serving a loader
- * cached six months ago is a normal state of the world, and replaying its calls against a
- * newer command set would mean guessing what they meant. Refusing is the honest answer,
- * and the typed API is still there for anyone who imports the package.
- */
+/** Replays the queue, then swaps the stub for a live one. A queue from another protocol
+ * version is dropped with a warning rather than guessed at. */
 export function drainQueue(options: DrainOptions): CheckoutInstance | null {
   const { view } = options;
   const globalName = options.globalName ?? DEFAULT_GLOBAL_NAME;
@@ -118,8 +109,7 @@ export function drainQueue(options: DrainOptions): CheckoutInstance | null {
       try {
         runner.call(args);
       } catch (cause) {
-        // One bad command should not swallow the ones behind it: a merchant who typo'd a
-        // selector still wants their event handlers registered.
+        // One bad command should not drop the ones queued behind it.
         warn(`checkout-embed: ${cause instanceof Error ? cause.message : String(cause)}`);
       }
     }

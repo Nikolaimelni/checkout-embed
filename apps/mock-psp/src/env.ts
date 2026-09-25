@@ -1,10 +1,7 @@
 import { describeIssues, IntegritySchema, SecureUrlSchema } from '@checkout-embed/contracts';
 import { z } from 'zod';
 
-/**
- * Obvious enough that nobody will mistake it for a real one, and long enough to pass the
- * schema. Production refuses to boot with it.
- */
+/** Production refuses to boot with this one. */
 const DEV_WEBHOOK_SECRET = 'development-webhook-secret-do-not-ship';
 
 const EnvSchema = z.object({
@@ -23,8 +20,7 @@ const EnvSchema = z.object({
   WEBHOOK_SECRET: z.string().min(16).default(DEV_WEBHOOK_SECRET),
   /** Comma separated. A key outside this list gets a 404 from the config route. */
   MERCHANT_KEYS: z.string().min(1).default('mk_test_acme'),
-  /** Comma separated origins, or * to answer anyone. An embedded checkout is always
-   * cross origin, so this is not optional in the way it is for a normal API. */
+  /** Comma separated origins, or * for anyone. Every /v1 call from the widget is cross origin. */
   ALLOWED_ORIGINS: z.string().min(1).default('*'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });

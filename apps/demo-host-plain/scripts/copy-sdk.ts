@@ -2,11 +2,7 @@ import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-/**
- * Copies the built SDK next to the page instead of importing it. A merchant serves these
- * two files from their own CDN, and a host that reached into node_modules would be
- * proving something nobody can reproduce.
- */
+// Copied, not imported: a merchant serves these two files from their own CDN.
 const sdkDist = join(
   dirname(createRequire(import.meta.url).resolve('@checkout-embed/sdk/package.json')),
   'dist',

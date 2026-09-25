@@ -181,13 +181,8 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
   }
 }
 
-/**
- * A pure reducer with one injected port. An action the current state has no transition
- * for is dropped and logged, never applied halfway: this is the difference between a
- * widget that shows the wrong screen and one that shows the same screen twice.
- *
- * Dropping returns the state by identity, so a React consumer bails out of the render.
- */
+/** An action with no transition from the current state is logged and dropped, and the same
+ * state object comes back, so React skips the render. */
 export function createCheckoutReducer(options: CheckoutReducerOptions = {}): CheckoutReducer {
   const logger = options.logger ?? silentLogger;
   const maxPollAttempts = options.maxPollAttempts ?? DEFAULT_MAX_POLL_ATTEMPTS;

@@ -17,10 +17,7 @@ export function createRootLogger(level: string): Logger {
   return pino({ level, base: { service: 'mock-psp' } });
 }
 
-/**
- * The request id follows the work, not the parameter list. Anything below the route handler
- * calls log() and gets a logger that already knows which request it is serving.
- */
+/** The current request's logger, request id included, without threading it through calls. */
 export function log(): Logger {
   const context = storage.getStore();
   if (context) return context.log;

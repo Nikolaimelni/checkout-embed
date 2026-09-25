@@ -9,10 +9,7 @@ import { TRIGGERS } from '../payments/triggers.ts';
 
 type JsonSchema = Record<string, unknown>;
 
-/**
- * The same Zod schemas that guard the routes at runtime. A document written by hand
- * alongside the validation is a document that is wrong within a month.
- */
+/** Built from the schemas the routes validate with, so the document cannot drift. */
 function jsonSchema(schema: z.ZodType<unknown>, io: 'input' | 'output'): JsonSchema {
   const { $schema, ...rest } = z.toJSONSchema(schema, {
     target: 'draft-2020-12',

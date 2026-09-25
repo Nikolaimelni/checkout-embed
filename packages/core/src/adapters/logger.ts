@@ -1,16 +1,12 @@
 export type LogLevel = 'debug' | 'warn' | 'error';
 
-/**
- * One method rather than one per level. The widget runs inside someone else's page and a
- * merchant may want every line routed to their own telemetry, which is easier to wire up
- * when there is a single entry point.
- */
+/** One method, so piping every line into a merchant's telemetry is one function. */
 export type Logger = {
   log(level: LogLevel, message: string, detail?: Readonly<Record<string, unknown>>): void;
 };
 
 export const silentLogger: Logger = {
   log() {
-    // The default: nothing goes to the merchant's console unless they pass a logger.
+    // Silent unless the merchant passes a logger.
   },
 };

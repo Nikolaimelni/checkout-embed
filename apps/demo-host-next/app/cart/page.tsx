@@ -4,11 +4,8 @@ import { pspUrl } from '../../env';
 
 const AMOUNT = { amountMinor: 4999, currency: 'EUR' } as const;
 
-/**
- * A server component that renders a client one, with no dynamic import and no ssr: false.
- * That is deliberate. The SDK has to be safe to import on a server, and reaching for
- * next/dynamic would hide the day it stops being: this page failing to build is the test.
- */
+// Imported straight into a server component, no next/dynamic. If the SDK stops being safe
+// to import on a server, this page stops building.
 export default function Cart() {
   return (
     <>

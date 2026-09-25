@@ -4,10 +4,7 @@ import { PaymentIntentIdSchema, PaymentMethodIdSchema } from './identifiers.js';
 import { MoneySchema } from './money.js';
 import { SecureUrlSchema } from './secure-url.js';
 
-/**
- * Provider-side status. Deliberately not the same vocabulary as the widget's own state
- * machine: one describes the money, the other describes the screen.
- */
+/** The provider's status. It describes the money; the widget's own machine describes the screen. */
 export const PaymentIntentStatusSchema = zEnum([
   'requires_confirmation',
   'requires_action',

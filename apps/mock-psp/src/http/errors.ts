@@ -42,11 +42,7 @@ export function notFoundHandler(_request: Request, response: Response): void {
     .json({ error: { code: 'not_found', message: 'No route matches this path.' } });
 }
 
-/**
- * express.json() rejects a body it cannot read with an http-errors object rather than one
- * of ours. The status on it is the client's mistake, and answering 500 would tell the SDK
- * to retry the same broken request.
- */
+/** express.json() throws http-errors objects. A 4xx there is the client's, and 500 would make the SDK retry. */
 function fromBodyParser(error: unknown): ApiError | null {
   if (!(error instanceof Error) || !('status' in error)) return null;
 
@@ -60,10 +56,7 @@ function fromBodyParser(error: unknown): ApiError | null {
   return null;
 }
 
-/**
- * The only place that turns a thrown thing into a status code. Handlers throw ApiError and
- * stop caring; anything else is a bug and is reported as one without leaking its message.
- */
+/** Anything that is not an ApiError is a bug, answered without leaking its message. */
 export function errorHandler(
   error: unknown,
   _request: Request,

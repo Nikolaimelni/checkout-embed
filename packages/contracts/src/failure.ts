@@ -14,10 +14,7 @@ export const CheckoutErrorCodeSchema = zEnum([
 
 export type CheckoutErrorCode = z.infer<typeof CheckoutErrorCodeSchema>;
 
-/**
- * The serialisable shape of a failure. Errors thrown inside the widget are class
- * instances; anything that crosses the host boundary is flattened to this.
- */
+/** A failure as it crosses the host boundary. Inside the widget it is a CheckoutError. */
 export const CheckoutFailureSchema = object({
   code: CheckoutErrorCodeSchema,
   message: string().min(1),

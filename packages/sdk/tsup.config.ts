@@ -30,9 +30,8 @@ export default defineConfig([
   {
     entry: { loader: 'src/loader/loader.ts' },
     format: ['iife'],
-    // Older than the rest of the repo on purpose. This file runs before anything else on
-    // a merchant's page, on whatever browser their customer turned up with, and it has to
-    // survive long enough to report that it cannot help.
+    // Older than the rest: this runs first on any browser a shopper has, and has to live long
+    // enough to warn that it cannot help.
     target: 'es2018',
     minify: true,
     sourcemap: true,

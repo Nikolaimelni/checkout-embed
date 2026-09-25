@@ -7,8 +7,7 @@ const container = document.getElementById('bench');
 
 if (!container) throw new Error('index.html has no #bench container');
 
-// StrictMode on purpose. It runs every effect twice in development, which is exactly the
-// condition an idempotent mount has to survive, and the bench is where that shows up first.
+// StrictMode runs every effect twice, which is what an idempotent mount has to survive.
 createRoot(container).render(
   <StrictMode>
     <Bench />

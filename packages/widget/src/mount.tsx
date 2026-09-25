@@ -90,12 +90,8 @@ function shadowFor(host: Element): ShadowRoot {
   }
 }
 
-/**
- * Idempotent by design rather than by guard clause. React StrictMode runs effects twice in
- * development, and a merchant calling mount from an effect is the normal case, not the
- * pathological one: the second call updates the instance that exists instead of building a
- * second widget behind the first.
- */
+/** Idempotent: StrictMode runs a merchant's effect twice, and the second call updates the
+ * widget already there. */
 export function mountWidget(host: Element, input: WidgetInput): WidgetView {
   const existing = instances.get(host);
   if (existing) {
@@ -122,9 +118,8 @@ export function mountWidget(host: Element, input: WidgetInput): WidgetView {
       disposeStyles();
       container.remove();
 
-      // React refuses to unmount a root synchronously while it is rendering, and a host
-      // calling this from its own effect cleanup is doing precisely that. This root is not
-      // theirs, so letting their pass finish first costs nothing and drops the warning.
+      // React warns about unmounting a root mid-render, which is what a host's effect cleanup
+      // does. Waiting a microtask costs nothing.
       queueMicrotask(() => root.unmount());
     },
   };
