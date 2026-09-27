@@ -26,6 +26,8 @@ describe('the node:sqlite proxy driver', () => {
     actionUrl: null,
     settleAt: null,
     outcome: 'succeed',
+    ownerHash: 'owner',
+    challengeToken: null,
     createdAt: 1_760_000_000_000,
     updatedAt: 1_760_000_000_000,
   };

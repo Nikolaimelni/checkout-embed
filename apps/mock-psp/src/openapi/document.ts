@@ -81,7 +81,7 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
         post: {
           summary: 'Create a payment intent',
           description:
-            'Requires an Idempotency-Key. The same key with the same body replays the original intent and answers 200; the same key with a different body answers 409. A merchant key that is not registered answers 404.',
+            'Requires an Idempotency-Key. The same key with the same body replays the original intent and answers 200; the same key with a different body, or from another bearer token, answers 409. A merchant key that is not registered answers 404. The intent belongs to the bearer token that created it, and any other token gets 404 on it.',
           security: bearer,
           parameters: [idempotencyKey],
           requestBody: {

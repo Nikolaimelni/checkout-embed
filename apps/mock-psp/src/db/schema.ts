@@ -13,6 +13,10 @@ export const paymentIntents = sqliteTable('payment_intents', {
   settleAt: integer('settle_at'),
   /** The outcome the trigger amount picked, decided once at creation. */
   outcome: text('outcome').notNull(),
+  /** sha256 of the bearer token that created it. Rows from before the column match no one. */
+  ownerHash: text('owner_hash'),
+  /** The secret in the 3DS link, set while a challenge is open and cleared once it is used. */
+  challengeToken: text('challenge_token'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

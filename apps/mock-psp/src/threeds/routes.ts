@@ -1,6 +1,13 @@
 import express, { Router } from 'express';
 import { validate, validated } from '../http/validate.ts';
-import { type IntentParams, IntentParamsSchema } from '../payments/dto.ts';
+import {
+  type ChallengeForm,
+  ChallengeFormSchema,
+  type ChallengeQuery,
+  ChallengeQuerySchema,
+  type IntentParams,
+  IntentParamsSchema,
+} from '../payments/dto.ts';
 import type { PaymentsService } from '../payments/service.ts';
 
 function escapeHtml(value: string): string {
@@ -53,33 +60,40 @@ export function threeDsRouter(service: PaymentsService): Router {
     next();
   });
 
-  router.get('/:id', validate({ params: IntentParamsSchema }), (_request, response) => {
-    const { params } = validated<unknown, IntentParams>(response);
-    const id = escapeHtml(params.id);
+  router.get(
+    '/:id',
+    validate({ params: IntentParamsSchema, query: ChallengeQuerySchema }),
+    async (_request, response) => {
+      const { params, query } = validated<unknown, IntentParams, ChallengeQuery>(response);
+      await service.openChallenge(params.id, query.token);
+      const id = escapeHtml(params.id);
 
-    response.type('html').send(
-      page(
-        'Confirm your payment',
-        `<h1>Confirm your payment</h1>
+      // The token goes back in the form body, so the POST that moves the payment needs it too.
+      response.type('html').send(
+        page(
+          'Confirm your payment',
+          `<h1>Confirm your payment</h1>
          <p>Your bank would ask for a code here. This one asks for a click.</p>
          <p><code>${id}</code></p>
          <form method="post" action="/3ds/${id}/complete" class="row">
+           <input type="hidden" name="token" value="${escapeHtml(query.token)}">
            <button class="approve" name="approved" value="yes" type="submit">Approve</button>
            <button class="reject" name="approved" value="no" type="submit">Reject</button>
          </form>`,
-      ),
-    );
-  });
+        ),
+      );
+    },
+  );
 
   router.post(
     '/:id/complete',
-    express.urlencoded({ extended: false }),
-    validate({ params: IntentParamsSchema }),
-    async (request, response) => {
-      const { params } = validated<unknown, IntentParams>(response);
-      const approved = (request.body as { approved?: unknown }).approved === 'yes';
+    express.urlencoded({ extended: false, limit: '1kb' }),
+    validate({ params: IntentParamsSchema, body: ChallengeFormSchema }),
+    async (_request, response) => {
+      const { params, body } = validated<ChallengeForm, IntentParams>(response);
+      const approved = body.approved === 'yes';
 
-      const intent = await service.completeChallenge(params.id, approved);
+      const intent = await service.completeChallenge(params.id, body.token, approved);
 
       // '*' because the mock does not know merchant domains. A real provider pins it.
       const message = JSON.stringify({

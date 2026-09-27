@@ -4,6 +4,7 @@ import {
   bearerGuard,
   idempotencyGuard,
   idempotencyKeyOf,
+  ownerOf,
   validate,
   validated,
 } from '../http/validate.ts';
@@ -33,7 +34,11 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
         throw new ApiError('not_found', `No merchant is registered under ${body.merchantKey}.`);
       }
 
-      const { intent, replayed } = await service.create(body, idempotencyKeyOf(response));
+      const { intent, replayed } = await service.create(
+        body,
+        idempotencyKeyOf(response),
+        ownerOf(response),
+      );
 
       // 201 the first time, 200 on a replay.
       response.status(replayed ? 200 : 201).json(intent);
@@ -48,7 +53,9 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
     async (_request, response) => {
       const { params, body } = validated<ConfirmIntentBody, IntentParams>(response);
 
-      response.json(await service.confirm(params.id, body, idempotencyKeyOf(response)));
+      response.json(
+        await service.confirm(params.id, body, idempotencyKeyOf(response), ownerOf(response)),
+      );
     },
   );
 
@@ -59,7 +66,7 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
     async (_request, response) => {
       const { params } = validated<unknown, IntentParams>(response);
 
-      response.json(await service.read(params.id));
+      response.json(await service.read(params.id, ownerOf(response)));
     },
   );
 

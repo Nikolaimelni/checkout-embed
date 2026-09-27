@@ -39,6 +39,16 @@ async function createIntent(amountMinor: number, key = `key_${amountMinor}`) {
 const confirm = (id: string, key = `confirm_${id}`, methodId = 'pm_card') =>
   post(`/v1/payment-intents/${id}/confirm`).set('idempotency-key', key).send({ methodId });
 
+/** Confirms a 3DS amount and returns the challenge link as a path with its token. */
+async function challengeFor(id: string): Promise<{ path: string; token: string }> {
+  const confirmed = await confirm(id);
+  const url = new URL(confirmed.body.actionUrl as string);
+  return { path: `${url.pathname}${url.search}`, token: url.searchParams.get('token') ?? '' };
+}
+
+const complete = (id: string, token: string, approved: 'yes' | 'no') =>
+  request(harness.app).post(`/3ds/${id}/complete`).type('form').send({ token, approved });
+
 describe('POST /v1/payment-intents', () => {
   it('refuses a request without a bearer token', async () => {
     const response = await request(harness.app)
@@ -150,7 +160,9 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
     const confirmed = await confirm(intent.id);
 
     expect(confirmed.body.status).toBe('requires_action');
-    expect(confirmed.body.actionUrl).toBe(`https://psp.test/3ds/${intent.id}`);
+    const url = new URL(confirmed.body.actionUrl);
+    expect(url.origin + url.pathname).toBe(`https://psp.test/3ds/${intent.id}`);
+    expect(url.searchParams.get('token')).toMatch(/^[A-Za-z0-9_-]{32}$/);
   });
 
   it('leaves the stalling amount in processing however long you wait', async () => {
@@ -210,19 +222,58 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
   });
 });
 
+describe('another caller', () => {
+  const stranger = 'Bearer someone-else';
+
+  it('cannot read an intent it did not create, even with its id', async () => {
+    const intent = await createIntent(SUCCEEDS);
+
+    const response = await request(harness.app)
+      .get(`/v1/payment-intents/${intent.id}`)
+      .set('authorization', stranger);
+
+    expect(response.status).toBe(404);
+  });
+
+  it('cannot confirm one either', async () => {
+    const intent = await createIntent(SUCCEEDS);
+
+    const response = await request(harness.app)
+      .post(`/v1/payment-intents/${intent.id}/confirm`)
+      .set('authorization', stranger)
+      .set('idempotency-key', 'confirm_stranger')
+      .send({ methodId: 'pm_card' });
+
+    expect(response.status).toBe(404);
+    const unchanged = await get(`/v1/payment-intents/${intent.id}`);
+    expect(unchanged.body.status).toBe('requires_confirmation');
+  });
+
+  it('cannot fish an intent out by replaying its idempotency key', async () => {
+    await createIntent(SUCCEEDS, 'key_shared');
+
+    const response = await request(harness.app)
+      .post('/v1/payment-intents')
+      .set('authorization', stranger)
+      .set('idempotency-key', 'key_shared')
+      .send(intentBody(SUCCEEDS));
+
+    expect(response.status).toBe(409);
+    expect(JSON.stringify(response.body)).not.toContain('pi_');
+  });
+});
+
 describe('the 3DS challenge', () => {
   it('walks approve through to a settled payment', async () => {
     const intent = await createIntent(NEEDS_3DS);
-    await confirm(intent.id);
+    const { path, token } = await challengeFor(intent.id);
 
-    const page = await request(harness.app).get(`/3ds/${intent.id}`);
+    const page = await request(harness.app).get(path);
     expect(page.status).toBe(200);
     expect(page.text).toContain(`/3ds/${intent.id}/complete`);
+    expect(page.text).toContain(`value="${token}"`);
 
-    await request(harness.app)
-      .post(`/3ds/${intent.id}/complete`)
-      .type('form')
-      .send({ approved: 'yes' });
+    expect((await complete(intent.id, token, 'yes')).status).toBe(200);
     harness.clock.advance(SETTLE_DELAY_MS);
 
     const settled = await get(`/v1/payment-intents/${intent.id}`);
@@ -231,12 +282,9 @@ describe('the 3DS challenge', () => {
 
   it('fails the payment when the challenge is rejected', async () => {
     const intent = await createIntent(NEEDS_3DS, 'key_reject');
-    await confirm(intent.id);
+    const { token } = await challengeFor(intent.id);
 
-    await request(harness.app)
-      .post(`/3ds/${intent.id}/complete`)
-      .type('form')
-      .send({ approved: 'no' });
+    await complete(intent.id, token, 'no');
 
     const failed = await get(`/v1/payment-intents/${intent.id}`);
     expect(failed.body.status).toBe('failed');
@@ -244,12 +292,56 @@ describe('the 3DS challenge', () => {
 
   it('lets a merchant page frame it', async () => {
     const intent = await createIntent(NEEDS_3DS, 'key_frame');
-    await confirm(intent.id);
+    const { path } = await challengeFor(intent.id);
 
-    const page = await request(harness.app).get(`/3ds/${intent.id}`);
+    const page = await request(harness.app).get(path);
 
     expect(page.headers['x-frame-options']).toBeUndefined();
     expect(page.headers['content-security-policy']).toContain('frame-ancestors *');
+  });
+
+  it('serves no page without the token from the link', async () => {
+    const intent = await createIntent(NEEDS_3DS, 'key_no_token');
+    await challengeFor(intent.id);
+
+    const bare = await request(harness.app).get(`/3ds/${intent.id}`);
+    const forged = await request(harness.app).get(`/3ds/${intent.id}?token=${'a'.repeat(32)}`);
+
+    expect(bare.status).toBe(400);
+    expect(forged.status).toBe(404);
+  });
+
+  it('lets nobody approve a challenge with a guessed token', async () => {
+    const intent = await createIntent(NEEDS_3DS, 'key_guess');
+    await challengeFor(intent.id);
+
+    const response = await complete(intent.id, 'a'.repeat(32), 'yes');
+
+    expect(response.status).toBe(404);
+    expect((await get(`/v1/payment-intents/${intent.id}`)).body.status).toBe('requires_action');
+  });
+
+  it('takes the token once', async () => {
+    const intent = await createIntent(NEEDS_3DS, 'key_twice');
+    const { token } = await challengeFor(intent.id);
+    await complete(intent.id, token, 'no');
+
+    const again = await complete(intent.id, token, 'yes');
+
+    expect(again.status).toBe(404);
+    expect((await get(`/v1/payment-intents/${intent.id}`)).body.status).toBe('failed');
+  });
+
+  it('refuses an answer that is neither yes nor no', async () => {
+    const intent = await createIntent(NEEDS_3DS, 'key_maybe');
+    const { token } = await challengeFor(intent.id);
+
+    const response = await request(harness.app)
+      .post(`/3ds/${intent.id}/complete`)
+      .type('form')
+      .send({ token, approved: 'maybe' });
+
+    expect(response.status).toBe(400);
   });
 });
 

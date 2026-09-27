@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describeIssues } from '@checkout-embed/contracts';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { z } from 'zod';
@@ -59,10 +60,17 @@ export function requireBearer(request: Request): string {
   return token;
 }
 
-export const bearerGuard: RequestHandler = (request, _response, next) => {
-  requireBearer(request);
+/** Nothing verifies the token, so it is at least what ties a caller to the intents it made. */
+export const bearerGuard: RequestHandler = (request, response, next) => {
+  response.locals['owner'] = createHash('sha256').update(requireBearer(request)).digest('hex');
   next();
 };
+
+export function ownerOf(response: Response): string {
+  const owner = response.locals['owner'] as string | undefined;
+  if (!owner) throw new Error('bearerGuard did not run for this route.');
+  return owner;
+}
 
 export const idempotencyGuard: RequestHandler = (request, response, next) => {
   response.locals['idempotencyKey'] = requireIdempotencyKey(request);

@@ -87,8 +87,9 @@ export function createApp(options: AppOptions): Express {
 
   const limits = options.rateLimit ?? { windowMs: 60_000, limit: 120 };
   if (limits !== false) {
+    // The 3DS pages too: they are public and the complete route moves a payment.
     app.use(
-      '/v1',
+      ['/v1', '/3ds'],
       rateLimit({
         ...limits,
         standardHeaders: 'draft-7',

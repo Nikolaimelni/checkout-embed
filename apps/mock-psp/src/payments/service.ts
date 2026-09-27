@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { type PaymentIntent, PaymentIntentSchema } from '@checkout-embed/contracts';
 import { ApiError } from '../http/errors.ts';
 import type { WebhookEvent, WebhookQueue } from '../webhooks/queue.ts';
@@ -16,10 +16,17 @@ export type PaymentsServiceOptions = {
 export type CreateResult = { readonly intent: PaymentIntent; readonly replayed: boolean };
 
 export type PaymentsService = {
-  create(body: CreateIntentBody, idempotencyKey: string): Promise<CreateResult>;
-  confirm(id: string, body: ConfirmIntentBody, idempotencyKey: string): Promise<PaymentIntent>;
-  read(id: string): Promise<PaymentIntent>;
-  completeChallenge(id: string, approved: boolean): Promise<PaymentIntent>;
+  create(body: CreateIntentBody, idempotencyKey: string, owner: string): Promise<CreateResult>;
+  confirm(
+    id: string,
+    body: ConfirmIntentBody,
+    idempotencyKey: string,
+    owner: string,
+  ): Promise<PaymentIntent>;
+  read(id: string, owner: string): Promise<PaymentIntent>;
+  /** Throws unless the link is for an open challenge. */
+  openChallenge(id: string, token: string): Promise<void>;
+  completeChallenge(id: string, token: string, approved: boolean): Promise<PaymentIntent>;
   settleDue(): Promise<number>;
 };
 
@@ -40,13 +47,33 @@ function hashRequest(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
 
+function sameToken(expected: string, received: string): boolean {
+  const left = Buffer.from(expected);
+  const right = Buffer.from(received);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
 export function createPaymentsService(options: PaymentsServiceOptions): PaymentsService {
   const { repository, webhooks, publicBaseUrl } = options;
   const now = options.now ?? Date.now;
 
-  async function mustFind(id: string): Promise<IntentRow> {
+  /** Someone else's intent answers like a missing one, so a known id is not enough. */
+  async function mustOwn(id: string, owner: string): Promise<IntentRow> {
     const row = await repository.byId(id);
-    if (!row) throw new ApiError('not_found', `No payment intent with id ${id}.`);
+    if (!row || row.ownerHash !== owner) {
+      throw new ApiError('not_found', `No payment intent with id ${id}.`);
+    }
+    return row;
+  }
+
+  /** A wrong token, a used one and an intent with no challenge all look the same. */
+  async function openChallengeRow(id: string, token: string): Promise<IntentRow> {
+    const row = await repository.byId(id);
+    const expected = row?.status === 'requires_action' ? row.challengeToken : null;
+
+    if (!row || expected === null || !sameToken(expected, token)) {
+      throw new ApiError('not_found', 'No open challenge at this address.');
+    }
     return row;
   }
 
@@ -77,7 +104,7 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
   }
 
   return {
-    async create(body, idempotencyKey) {
+    async create(body, idempotencyKey, owner) {
       const hash = hashRequest([
         body.merchantKey,
         body.money.amountMinor,
@@ -87,14 +114,15 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       const seen = await repository.findKey(body.merchantKey, idempotencyKey);
 
       if (seen) {
-        if (seen.requestHash !== hash) {
+        const earlier = await repository.byId(seen.intentId);
+        if (seen.requestHash !== hash || earlier?.ownerHash !== owner) {
           throw new ApiError(
             'idempotency_conflict',
-            'This Idempotency-Key was already used with a different request body.',
+            'This Idempotency-Key was already used with a different request.',
             { idempotencyKey },
           );
         }
-        return { intent: toDto(await mustFind(seen.intentId)), replayed: true };
+        return { intent: toDto(earlier), replayed: true };
       }
 
       const at = now();
@@ -108,6 +136,8 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
         actionUrl: null,
         settleAt: null,
         outcome: outcomeFor(body.money.amountMinor),
+        ownerHash: owner,
+        challengeToken: null,
         createdAt: at,
         updatedAt: at,
       };
@@ -124,8 +154,8 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       return { intent: toDto(row), replayed: false };
     },
 
-    async confirm(id, body, idempotencyKey) {
-      const row = await mustFind(id);
+    async confirm(id, body, idempotencyKey, owner) {
+      const row = await mustOwn(id, owner);
       const hash = hashRequest(['confirm', id, body.methodId]);
       const seen = await repository.findKey(row.merchantKey, idempotencyKey);
 
@@ -154,13 +184,17 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
         switch (row.outcome) {
           case 'decline':
             return { status: 'failed', methodId: body.methodId, updatedAt: at };
-          case 'require_action':
+          case 'require_action': {
+            // The link is the only credential the challenge page gets, so it carries a secret.
+            const challengeToken = randomBytes(24).toString('base64url');
             return {
               status: 'requires_action',
               methodId: body.methodId,
-              actionUrl: `${publicBaseUrl}/3ds/${row.id}`,
+              actionUrl: `${publicBaseUrl}/3ds/${row.id}?token=${challengeToken}`,
+              challengeToken,
               updatedAt: at,
             };
+          }
           case 'stall':
             return {
               status: 'processing',
@@ -193,27 +227,25 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       return toDto(next);
     },
 
-    async read(id) {
-      const row = await mustFind(id);
+    async read(id, owner) {
+      const row = await mustOwn(id, owner);
       const at = now();
 
       return toDto(isDue(row, at) ? await settle(row, at) : row);
     },
 
-    async completeChallenge(id, approved) {
-      const row = await mustFind(id);
+    async openChallenge(id, token) {
+      await openChallengeRow(id, token);
+    },
 
-      if (row.status !== 'requires_action') {
-        throw new ApiError(
-          'conflict',
-          `There is no open challenge on this payment intent, it is ${row.status}.`,
-        );
-      }
+    async completeChallenge(id, token, approved) {
+      const row = await openChallengeRow(id, token);
 
       const at = now();
+      const closed = { actionUrl: null, challengeToken: null, updatedAt: at } as const;
       const patch: Partial<IntentRow> = approved
-        ? { status: 'processing', actionUrl: null, settleAt: at + SETTLE_DELAY_MS, updatedAt: at }
-        : { status: 'failed', actionUrl: null, settleAt: null, updatedAt: at };
+        ? { ...closed, status: 'processing', settleAt: at + SETTLE_DELAY_MS }
+        : { ...closed, status: 'failed', settleAt: null };
 
       await repository.patch(id, patch);
       const next = { ...row, ...patch };
