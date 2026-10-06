@@ -7,7 +7,7 @@ import {
   type PaymentMethod,
   type PaymentMethodId,
 } from '@checkout-embed/contracts';
-import { createEventBus } from '@checkout-embed/core';
+import { createEventBus, type EventBus } from '@checkout-embed/core';
 import {
   type CheckoutApi,
   type CheckoutController,
@@ -25,6 +25,8 @@ export type DriverOptions = {
   readonly challengeUrl: string;
   /** How long the fake provider takes to answer, and the poll interval. */
   readonly latencyMs?: number;
+  /** Where the events a merchant would subscribe to go. */
+  readonly events?: EventBus;
 };
 
 export type Driver = CheckoutController;
@@ -99,7 +101,7 @@ export function createDriver(options: DriverOptions): Driver {
     api: provider.api,
     merchantKey: SANDBOX_KEY,
     total: options.total,
-    events: createEventBus(),
+    events: options.events ?? createEventBus(),
     pollIntervalMs: options.latencyMs ?? 500,
   });
 

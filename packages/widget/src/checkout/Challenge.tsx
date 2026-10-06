@@ -88,7 +88,7 @@ export function Challenge({
           referrerPolicy="no-referrer"
         />
         <div className="actions">
-          <Button hostTag={hostButtonTag} variant="secondary" onClick={onFinished}>
+          <Button hostTag={hostButtonTag} onClick={onFinished}>
             {labels.challengeDone}
           </Button>
           <Button hostTag={hostButtonTag} variant="secondary" onClick={onDismissed}>

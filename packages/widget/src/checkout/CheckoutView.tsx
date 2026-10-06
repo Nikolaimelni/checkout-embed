@@ -5,6 +5,7 @@ import { Challenge } from './Challenge.js';
 import { Button } from './HostElement.js';
 import type { WidgetIntent } from './intents.js';
 import { DEFAULT_LABELS, type Labels } from './labels.js';
+import { MethodIcon } from './MethodIcon.js';
 import { formatMoney } from './money.js';
 
 /** What instance.update() pushes in, derived from the schema that validates it. */
@@ -66,9 +67,11 @@ export function CheckoutView({
   const buttonTag = components?.button;
 
   return (
-    <div className="root">
-      <h1 className="heading">{labels.heading}</h1>
-      <p className="amount">{formatMoney(total, locale)}</p>
+    <div className="root" data-status={state.status}>
+      <header className="summary">
+        <h2 className="heading">{labels.heading}</h2>
+        <p className="amount">{formatMoney(total, locale)}</p>
+      </header>
 
       {/* Always in the tree, never empty on arrival: a live region inserted at the same
           moment as its text is not announced by most screen readers. */}
@@ -77,13 +80,27 @@ export function CheckoutView({
       </p>
 
       {host?.blockingMessage ? <p className="failure">{host.blockingMessage}</p> : renderBody()}
+
+      <p className="secured">
+        <Lock />
+        {labels.secured}
+      </p>
     </div>
   );
 
   function renderBody(): ReactNode {
     switch (state.status) {
       case 'idle':
-        return <p className="status">{labels.loading}</p>;
+        return (
+          <>
+            <ul className="methods" aria-hidden="true">
+              <li className="skeleton" />
+              <li className="skeleton" />
+              <li className="skeleton" />
+            </ul>
+            <p className="status">{labels.loading}</p>
+          </>
+        );
 
       case 'methods':
         return (
@@ -95,8 +112,10 @@ export function CheckoutView({
                   type="button"
                   onClick={() => onIntent({ type: 'select-method', methodId: method.id })}
                 >
+                  <MethodIcon method={method} />
                   <span className="method-label">{method.label}</span>
                   {method.last4 ? <span className="method-hint">•••• {method.last4}</span> : null}
+                  <Chevron />
                 </button>
               </li>
             ))}
@@ -106,7 +125,13 @@ export function CheckoutView({
       case 'details':
         return (
           <>
-            <p className="status">{state.method.label}</p>
+            <div className="method selected">
+              <MethodIcon method={state.method} />
+              <span className="method-label">{state.method.label}</span>
+              {state.method.last4 ? (
+                <span className="method-hint">•••• {state.method.last4}</span>
+              ) : null}
+            </div>
             {outsideLimits ? <p className="failure">{labels.outsideLimits}</p> : null}
             <div className="actions">
               <Button
@@ -128,12 +153,12 @@ export function CheckoutView({
         );
 
       case 'confirming':
-        return <p className="status">{labels.confirming}</p>;
+        return <Progress text={labels.confirming} />;
 
       case 'requires_action':
         return (
           <>
-            <p className="status">{labels.challengeTitle}</p>
+            <Progress text={labels.challengeTitle} />
             <Challenge
               actionUrl={state.actionUrl}
               intentId={state.intent.id}
@@ -146,12 +171,17 @@ export function CheckoutView({
         );
 
       case 'polling':
-        return <p className="status">{labels.polling}</p>;
+        return <Progress text={labels.polling} />;
 
       case 'succeeded':
         return (
           <>
-            <p className="status">{labels.succeeded}</p>
+            <div className="result">
+              <span className="result-icon positive" aria-hidden="true">
+                <Check />
+              </span>
+              <p className="result-title">{labels.succeeded}</p>
+            </div>
             <div className="actions">
               <Button
                 hostTag={buttonTag}
@@ -167,7 +197,13 @@ export function CheckoutView({
       case 'failed':
         return (
           <>
-            <p className="failure">{state.failure.message}</p>
+            <div className="result">
+              <span className="result-icon negative" aria-hidden="true">
+                <Cross />
+              </span>
+              <p className="result-title">{labels.failed}</p>
+              <p className="result-text">{state.failure.message}</p>
+            </div>
             <div className="actions">
               {state.retryable ? (
                 <Button hostTag={buttonTag} onClick={() => onIntent({ type: 'retry' })}>
@@ -186,4 +222,55 @@ export function CheckoutView({
         );
     }
   }
+}
+
+type ProgressProps = {
+  readonly text: string;
+};
+
+function Progress({ text }: ProgressProps) {
+  return (
+    <div className="progress">
+      <span className="spinner" aria-hidden="true" />
+      <p className="status">{text}</p>
+    </div>
+  );
+}
+
+function Chevron() {
+  return (
+    <svg className="chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function Check() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path d="m6 12.5 4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2.2" />
+    </svg>
+  );
+}
+
+function Cross() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="m7 7 10 10M17 7 7 17" fill="none" stroke="currentColor" strokeWidth="2.2" />
+    </svg>
+  );
+}
+
+function Lock() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <rect x="3" y="7" width="10" height="7" rx="1.8" fill="currentColor" />
+      <path
+        d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
 }

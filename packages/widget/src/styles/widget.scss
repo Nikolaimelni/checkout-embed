@@ -1,26 +1,33 @@
-// Everything here is scoped by the shadow root, so the selectors stay short and there is
-// no naming convention to defend. The host page cannot reach in and this cannot leak out.
+// Scoped by the shadow root, so the selectors stay short.
 
-$radius: 8px;
-$gap: 12px;
+$radius: 18px;
+$radius-inner: 14px;
+$font: system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
 
 :host {
+  // Public: a merchant can set any of these on the host element to bring the widget
+  // closer to their brand.
   --ce-surface: #fff;
-  --ce-ink: #14181a;
-  --ce-ink-muted: #5b6670;
-  --ce-line: #dfe3e6;
-  --ce-line-strong: #c3c9ce;
-  --ce-accent: #10695a;
+  --ce-surface-sunken: #f4f4f1;
+  --ce-surface-hover: #ebebe6;
+  --ce-ink: #111215;
+  --ce-ink-muted: #686b72;
+  --ce-line: #e6e6e0;
+  --ce-line-strong: #cfd0c9;
+  --ce-accent: #111215;
+  --ce-accent-hover: #2b2d33;
   --ce-accent-ink: #fff;
-  --ce-danger: #94271d;
-  --ce-danger-soft: #f6e4e1;
-  --ce-focus: #10695a;
+  --ce-positive: #0c7a4d;
+  --ce-positive-soft: #e2f3e9;
+  --ce-danger: #b42318;
+  --ce-danger-soft: #fdeceb;
+  --ce-focus: #3a5ccc;
 
   all: initial;
   display: block;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: $font;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ce-ink);
   text-align: left;
 }
@@ -36,155 +43,298 @@ $gap: 12px;
 }
 
 .root {
-  // Selectors from the host page cannot match anything in here, but inherited properties
-  // still flow in through the host element, and an outside declaration with !important
-  // beats :host. So the reset lives on the first element inside the shadow tree, which is
-  // the one place the host page has no way to reach.
+  // The reset lives here as well as on :host: an !important rule in the page beats :host,
+  // and this is the first element the page has no selector for.
   all: initial;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 400px;
+  padding: 22px;
+  font-family: $font;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ce-ink);
   text-align: left;
   background: var(--ce-surface);
   border: 1px solid var(--ce-line);
   border-radius: $radius;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 420px;
+  -webkit-font-smoothing: antialiased;
+}
+
+p,
+h2,
+ul {
+  margin: 0;
+}
+
+.summary {
+  display: grid;
+  gap: 2px;
 }
 
 .heading {
-  margin: 0;
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ce-ink-muted);
 }
 
 .amount {
-  margin: 0;
-  color: var(--ce-ink-muted);
+  font-size: 34px;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .methods {
-  list-style: none;
-  margin: 0;
+  display: grid;
+  gap: 8px;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: $gap * 0.5;
+  list-style: none;
 }
 
 .method {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 12px;
   align-items: center;
-  justify-content: space-between;
-  gap: $gap;
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--ce-line-strong);
-  border-radius: $radius - 2px;
-  background: var(--ce-surface);
+  min-height: 60px;
+  padding: 10px 14px 10px 10px;
   font: inherit;
   color: inherit;
-  cursor: pointer;
   text-align: left;
+  background: var(--ce-surface-sunken);
+  border: 1px solid transparent;
+  border-radius: $radius-inner;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
 
   &:hover {
-    border-color: var(--ce-accent);
+    background: var(--ce-surface-hover);
   }
 
-  &[aria-pressed="true"] {
-    border-color: var(--ce-accent);
-    box-shadow: inset 0 0 0 1px var(--ce-accent);
+  &:active {
+    transform: scale(0.99);
+  }
+
+  &.selected {
+    grid-template-columns: auto 1fr auto;
+    cursor: default;
+    background: var(--ce-surface);
+    border-color: var(--ce-line);
+  }
+}
+
+.method-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--ce-ink);
+  background: var(--ce-surface);
+  border: 1px solid var(--ce-line);
+  border-radius: 10px;
+
+  &.brand {
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    color: #1a2a8c;
   }
 }
 
 .method-label {
-  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 560;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .method-hint {
-  color: var(--ce-ink-muted);
   font-size: 13px;
+  color: var(--ce-ink-muted);
   font-variant-numeric: tabular-nums;
 }
 
+.chevron {
+  color: var(--ce-ink-muted);
+}
+
 .actions {
-  display: flex;
-  gap: $gap;
+  display: grid;
+  gap: 8px;
 }
 
 .button {
+  height: 52px;
+  padding: 0 18px;
   font: inherit;
-  padding: 10px 18px;
-  border-radius: $radius - 2px;
-  border: 1px solid var(--ce-accent);
-  background: var(--ce-accent);
+  font-weight: 600;
   color: var(--ce-accent-ink);
+  background: var(--ce-accent);
+  border: 0;
+  border-radius: $radius-inner;
   cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
+
+  &:hover {
+    background: var(--ce-accent-hover);
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
 
   &:disabled {
-    opacity: 0.55;
     cursor: default;
+    opacity: 0.35;
+    transform: none;
   }
 
   &.secondary {
-    background: transparent;
     color: var(--ce-ink);
-    border-color: var(--ce-line-strong);
+    background: var(--ce-surface-sunken);
+
+    &:hover {
+      background: var(--ce-surface-hover);
+    }
   }
 }
 
 .status {
-  margin: 0;
+  color: var(--ce-ink-muted);
+}
+
+.progress {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 60px;
+  padding: 0 4px;
+}
+
+.spinner {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--ce-line);
+  border-top-color: var(--ce-ink);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.skeleton {
+  height: 60px;
+  background: linear-gradient(
+    90deg,
+    var(--ce-surface-sunken) 30%,
+    var(--ce-surface-hover) 50%,
+    var(--ce-surface-sunken) 70%
+  );
+  background-size: 200% 100%;
+  border-radius: $radius-inner;
+  animation: shimmer 1400ms ease-in-out infinite;
+}
+
+.result {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  padding: 4px 0;
+}
+
+.result-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+
+  &.positive {
+    color: var(--ce-positive);
+    background: var(--ce-positive-soft);
+  }
+
+  &.negative {
+    color: var(--ce-danger);
+    background: var(--ce-danger-soft);
+  }
+}
+
+.result-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.result-text {
   color: var(--ce-ink-muted);
 }
 
 .failure {
-  margin: 0;
   padding: 12px 14px;
-  border-radius: $radius - 2px;
-  background: var(--ce-danger-soft);
+  font-size: 14px;
   color: var(--ce-danger);
+  background: var(--ce-danger-soft);
+  border-radius: 12px;
+}
+
+.secured {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding-top: 14px;
+  font-size: 12px;
+  color: var(--ce-ink-muted);
+  border-top: 1px solid var(--ce-line);
 }
 
 .challenge {
-  display: flex;
-  flex-direction: column;
-  gap: $gap;
+  display: grid;
+  gap: 12px;
+
+  .heading {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ce-ink);
+  }
 }
 
 .challenge-frame {
   width: 100%;
-  height: 320px;
+  height: 360px;
+  background: var(--ce-surface-sunken);
   border: 1px solid var(--ce-line);
-  border-radius: $radius - 2px;
-  background: var(--ce-surface);
+  border-radius: 12px;
 }
 
-// A modal <dialog> sits in the top layer, but inheritance still follows the DOM, so it
-// picks up the reset on .root. The browser's own dialog colours are the one thing that
-// would win over it.
+// The dialog sits in the top layer but still inherits from .root through the DOM. The
+// browser's own dialog colours are what it has to override.
 .dialog {
   width: calc(100% - 32px);
-  max-width: 460px;
-  padding: 20px;
-  border: 0;
-  border-radius: $radius;
-  background: var(--ce-surface);
+  max-width: 440px;
+  padding: 22px;
   color: var(--ce-ink);
+  background: var(--ce-surface);
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgb(17 18 21 / 24%);
 
   // Literal rather than a token: older engines do not pass custom properties to ::backdrop.
   &::backdrop {
-    background: rgb(20 24 26 / 45%);
+    background: rgb(17 18 21 / 48%);
   }
 }
 
-// Visible focus is not optional here: a payment form is exactly where somebody is using a
-// keyboard, and the host page's reset is not going to help.
+// Visible focus is not optional on a payment form, and the host page's reset will not help.
 :focus-visible {
   outline: 2px solid var(--ce-focus);
   outline-offset: 2px;
@@ -199,4 +349,32 @@ $gap: 12px;
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .skeleton {
+    animation: none;
+  }
+
+  .method,
+  .button {
+    transition: none;
+  }
 }

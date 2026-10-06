@@ -15,6 +15,7 @@ export type Labels = {
   readonly retry: string;
   readonly close: string;
   readonly outsideLimits: string;
+  readonly secured: string;
 };
 
 export const DEFAULT_LABELS: Labels = {
@@ -34,4 +35,5 @@ export const DEFAULT_LABELS: Labels = {
   retry: 'Try again',
   close: 'Close',
   outsideLimits: 'This amount is outside the limits on your account.',
+  secured: 'Card details go to the payment provider, never to this page.',
 };

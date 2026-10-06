@@ -9,7 +9,9 @@ import type { CheckoutState } from '@checkout-embed/core';
 
 export const TOTAL: Money = { amountMinor: 1000, currency: 'EUR' };
 
-export const CHALLENGE_URL = 'http://localhost:4000/3ds/pi_sandbox';
+// Next to the bench rather than on the mock provider, so the 3DS step also works where the
+// bench is hosted as static files.
+export const CHALLENGE_URL = new URL('challenge.html', document.baseURI).href;
 
 export const METHODS: readonly PaymentMethod[] = [
   PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' }),
