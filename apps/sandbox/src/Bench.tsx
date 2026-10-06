@@ -17,11 +17,12 @@ const HOSTILE_CSS = `
 `;
 
 const LOCALE = 'en-GB';
+const REPOSITORY = 'https://github.com/Nikolaimelni/checkout-embed';
 
 const OUTCOME_LABELS: Readonly<Record<Outcome, string>> = {
-  succeed: 'Approves',
-  decline: 'Declines',
-  require_action: 'Asks for 3DS',
+  succeed: 'Approve',
+  decline: 'Decline',
+  require_action: '3DS check',
 };
 
 // Two lines that add up to TOTAL, so the summary and the widget agree.
@@ -30,7 +31,7 @@ const ORDER: readonly { readonly label: string; readonly amountMinor: number }[]
   { label: 'Delivery', amountMinor: 150 },
 ];
 
-type Source = 'widget' | 'merchant';
+type Source = 'widget' | 'shop';
 
 type Entry = {
   readonly id: number;
@@ -63,21 +64,15 @@ export function Bench() {
         source,
         text,
       };
-      setLog((entries) => [entry, ...entries].slice(0, 14));
+      setLog((entries) => [entry, ...entries].slice(0, 12));
     };
 
-    // What a merchant would subscribe to with checkout.on(...).
+    // What a shop would subscribe to with checkout.on(...).
     const events = createEventBus();
     const unsubscribe = [
-      events.on('method:selected', (event) =>
-        record('merchant', `method:selected ${event.methodId}`),
-      ),
-      events.on('payment:success', (event) =>
-        record('merchant', `payment:success ${event.intentId}`),
-      ),
-      events.on('payment:error', (event) =>
-        record('merchant', `payment:error ${event.failure.code}`),
-      ),
+      events.on('method:selected', (event) => record('shop', `method:selected ${event.methodId}`)),
+      events.on('payment:success', (event) => record('shop', `payment:success ${event.intentId}`)),
+      events.on('payment:error', (event) => record('shop', `payment:error ${event.failure.code}`)),
     ];
 
     const driver = createDriver({
@@ -107,7 +102,7 @@ export function Bench() {
     };
   }, [host, outcome]);
 
-  // Syncs React with document.head, which is where a host page's stylesheet lives.
+  // Syncs React with document.head, which is where a shop's stylesheet lives.
   useEffect(() => {
     if (!hostile) return;
 
@@ -124,14 +119,16 @@ export function Bench() {
         <span className="brand">
           checkout<span>-embed</span>
         </span>
-        <span className="tag">Demo with test data. Nothing is charged.</span>
+        <span className="tag">Demo, test money only</span>
+        <a className="source-link" href={REPOSITORY}>
+          Source on GitHub
+        </a>
       </header>
 
       <main className="layout">
-        <section className="shop" aria-labelledby="order-title">
-          <p className="eyebrow">Acme Hardware · order 1042</p>
-          <h1 id="order-title">Checkout</h1>
-
+        <section className="summary" aria-labelledby="order-title">
+          <p className="eyebrow">Acme Hardware</p>
+          <h1 id="order-title">Your order</h1>
           <dl className="order">
             {ORDER.map((line) => (
               <div key={line.label}>
@@ -144,19 +141,25 @@ export function Bench() {
               <dd>{money(TOTAL.amountMinor)}</dd>
             </div>
           </dl>
-
-          <div className="stage">
-            {present ? (
-              <div ref={setHost} />
-            ) : (
-              <p className="gone">The widget was taken off the page. Turn it back on to remount.</p>
-            )}
-          </div>
+          <p className="explain">
+            The payment form is the widget. Everything around it pretends to be the shop that put it
+            on its page.
+          </p>
         </section>
 
-        <aside className="panel" aria-label="Test controls">
+        <div className="stage">
+          {present ? (
+            <div ref={setHost} />
+          ) : (
+            <p className="gone">The widget is off the page. Switch it back on to load it again.</p>
+          )}
+        </div>
+
+        <aside className="panel" aria-labelledby="panel-title">
+          <h2 id="panel-title">Try it</h2>
+
           <fieldset className="segmented">
-            <legend>The provider</legend>
+            <legend>What the bank says</legend>
             <div className="segments">
               {OUTCOMES.map((candidate) => (
                 <label key={candidate}>
@@ -171,14 +174,18 @@ export function Bench() {
                 </label>
               ))}
             </div>
+            <p className="hint">Then pick a card and press Pay.</p>
           </fieldset>
 
           <fieldset className="switches">
-            <legend>The page around it</legend>
+            <legend>Stress the shop page</legend>
             <label>
               <span>
-                Hostile stylesheet
-                <small>Red Comic Sans with !important on every element</small>
+                Break the shop's styles
+                <small>
+                  Turns the page into red Comic Sans. The widget is walled off from the page's CSS,
+                  so it should not change.
+                </small>
               </span>
               <input
                 type="checkbox"
@@ -190,8 +197,8 @@ export function Bench() {
             </label>
             <label>
               <span>
-                Widget on the page
-                <small>Off unmounts it, on mounts it again</small>
+                Show the widget
+                <small>Off removes it like a shop leaving the page, on brings it back.</small>
               </span>
               <input
                 type="checkbox"
@@ -204,9 +211,11 @@ export function Bench() {
           </fieldset>
 
           <section className="log" aria-labelledby="log-title">
-            <h2 id="log-title">Event log</h2>
+            <h3 id="log-title">What happened</h3>
             {log.length === 0 ? (
-              <p className="empty">Pick a method to start.</p>
+              <p className="hint">
+                Nothing yet. Clicks show up as widget, events the shop hears as shop.
+              </p>
             ) : (
               <ol>
                 {log.map((entry) => (
@@ -221,8 +230,8 @@ export function Bench() {
           </section>
 
           <p className="note">
-            The provider here runs in this tab. In the full setup it is a separate server,
-            <code>apps/mock-psp</code>, on another origin.
+            No server here: the payment provider runs inside this tab. The full project, with a real
+            one, runs locally. <a href={`${REPOSITORY}#readme`}>How</a>.
           </p>
         </aside>
       </main>
