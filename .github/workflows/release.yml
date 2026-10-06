@@ -1,7 +1,10 @@
 name: release
 
+# After ci passes on main, never instead of it: a red build does not reach the registry.
 on:
-  push:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
 
 concurrency: release
@@ -10,6 +13,7 @@ permissions: {}
 
 jobs:
   release:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -32,14 +37,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # This job does not wait for ci, so it runs the same checks before anything can reach
-      # the registry. pnpm release builds.
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-
       # Opens a release pull request while changesets are pending, and publishes once that
-      # pull request is merged.
+      # pull request is merged. pnpm release builds first.
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           publish: pnpm release
