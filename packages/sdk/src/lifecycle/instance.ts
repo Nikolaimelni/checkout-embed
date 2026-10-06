@@ -33,7 +33,6 @@ import { type CheckoutController, createCheckoutController } from '../checkout/c
 
 export type CheckoutOptions = {
   readonly config: CheckoutConfigInput;
-  /** The merchant owns authentication. We ask for a token and never keep one. */
   readonly auth: AuthAdapter;
   readonly logger?: Logger | undefined;
   readonly fetchImpl?: typeof fetch;
@@ -78,7 +77,6 @@ function tearDown(mounted: Mounted): void {
 
 const EMPTY_HOST: HostState = { balance: null, limits: null, blockingMessage: null };
 
-/** One instance per merchant key: two components calling init share a bus and a token. */
 const instances = new Map<MerchantKey, CheckoutInstance>();
 
 function resolveTarget(view: Window, target: Element | string): Element {
@@ -92,13 +90,12 @@ function resolveTarget(view: Window, target: Element | string): Element {
   return found;
 }
 
-/** One method list per instance. A failed load is not kept, so Try again asks again. */
 function cachingConfig(api: CheckoutApi): CheckoutApi {
   let config: Promise<RemoteWidgetConfig> | null = null;
 
   return {
     ...api,
-    // No signal: the request is shared, and one unmount must not cancel it for the rest.
+    // no signal: the request is shared, one unmount must not cancel it for the others
     loadConfig(merchantKey) {
       config ??= api.loadConfig(merchantKey).catch((cause: unknown) => {
         config = null;
@@ -184,8 +181,6 @@ export function init(options: CheckoutOptions): CheckoutInstance {
         ...(mountOptions.labels ? { labels: mountOptions.labels } : {}),
       };
 
-      // The same element again keeps its view and gets a new controller. The old one stops
-      // here instead of polling behind a view that no longer reads it.
       const previous = mounts.get(element);
       const mounted: Mounted = { view: mountWidget(element, input), controller, input };
       previous?.controller.dispose();
@@ -206,7 +201,6 @@ export function init(options: CheckoutOptions): CheckoutInstance {
     update(patch) {
       refuseIfTerminated();
 
-      // A patch, validated even in-process: a limit passed as a string would disable Pay.
       const parsed = HostMessageSchema.safeParse({ type: 'host/update', ...host, ...patch });
 
       if (!parsed.success || parsed.data.type !== 'host/update') {
@@ -245,7 +239,6 @@ export function init(options: CheckoutOptions): CheckoutInstance {
   return instance;
 }
 
-/** Drops every cached instance. Exists for tests and for a host page tearing itself down. */
 export function terminateAll(): void {
   for (const instance of [...instances.values()]) instance.terminate();
 }

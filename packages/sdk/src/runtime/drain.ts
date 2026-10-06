@@ -28,8 +28,6 @@ function isTarget(value: unknown): value is Element | string {
   return typeof value === 'string' || value instanceof Element;
 }
 
-/** Turns queued arguments back into calls. They come from a page we do not control, so
- * each one is checked. */
 export function createCommandRunner(warn: (message: string) => void): CommandRunner {
   let current: CheckoutInstance | null = null;
 
@@ -86,8 +84,6 @@ export function createCommandRunner(warn: (message: string) => void): CommandRun
   };
 }
 
-/** Replays the queue, then swaps the stub for a live one. A queue from another protocol
- * version is dropped with a warning rather than guessed at. */
 export function drainQueue(options: DrainOptions): CheckoutInstance | null {
   const { view } = options;
   const globalName = options.globalName ?? DEFAULT_GLOBAL_NAME;
@@ -109,7 +105,6 @@ export function drainQueue(options: DrainOptions): CheckoutInstance | null {
       try {
         runner.call(args);
       } catch (cause) {
-        // One bad command should not drop the ones queued behind it.
         warn(`checkout-embed: ${cause instanceof Error ? cause.message : String(cause)}`);
       }
     }

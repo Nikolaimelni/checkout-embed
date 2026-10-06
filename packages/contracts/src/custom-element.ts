@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import { string } from 'zod';
 
-/** Names the spec reserves. They contain a dash, and customElements.define throws on them. */
 const RESERVED_NAMES: ReadonlySet<string> = new Set([
   'annotation-xml',
   'color-profile',
@@ -13,7 +12,6 @@ const RESERVED_NAMES: ReadonlySet<string> = new Set([
   'missing-glyph',
 ]);
 
-/** Checked here because the name comes from someone else's config. */
 export const CustomElementNameSchema = string()
   .regex(/^[a-z][a-z0-9._]*-[a-z0-9._-]*$/, {
     error: 'expected a lowercase custom element name containing a dash',

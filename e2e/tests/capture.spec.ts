@@ -1,10 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-/**
- * Not a test. `pnpm --filter @checkout-embed/e2e capture` runs these on their own config and
- * writes the images the README uses, so the pictures show the running thing and not a
- * mockup that drifted.
- */
 const OUT = '../docs/images';
 
 const widget = (page: Page) => page.locator('#checkout');

@@ -1,11 +1,3 @@
-/**
- * A receiver you can point WEBHOOK_URL at to watch deliveries arrive and see the signature
- * check pass or fail with your own eyes. Reads the raw bytes rather than a parsed body,
- * because the signature covers what was sent and not what JSON.parse made of it.
- *
- *   node scripts/webhook-receiver.ts [port]
- *   WEBHOOK_URL=http://localhost:4100/hooks pnpm dev
- */
 import { createServer } from 'node:http';
 import { env } from '../src/env.ts';
 import { SIGNATURE_HEADER, verifySignature } from '../src/webhooks/signature.ts';
@@ -40,8 +32,6 @@ const server = createServer((request, response) => {
       ].join('\n'),
     );
 
-    // A receiver that answers anything other than 2xx is telling the provider to retry,
-    // which is exactly what you want to try out here.
     response.writeHead(valid ? 200 : 400).end();
   });
 });

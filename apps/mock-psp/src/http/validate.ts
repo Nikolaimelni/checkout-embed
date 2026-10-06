@@ -13,7 +13,6 @@ function parseOrThrow<T>(schema: z.ZodType<T>, value: unknown, where: string): T
   });
 }
 
-/** Express 5 makes req.params and req.query getters, so parsed values go on res.locals. */
 export type Validated<TBody = unknown, TParams = unknown, TQuery = unknown> = {
   body: TBody;
   params: TParams;
@@ -48,7 +47,6 @@ export function validate(schemas: ValidationSchemas): RequestHandler {
   };
 }
 
-/** Any non-empty token passes. The mock only checks that the integration sends one. */
 export function requireBearer(request: Request): string {
   const header = request.get('authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
@@ -60,7 +58,6 @@ export function requireBearer(request: Request): string {
   return token;
 }
 
-/** Nothing verifies the token, so it is at least what ties a caller to the intents it made. */
 export const bearerGuard: RequestHandler = (request, response, next) => {
   response.locals['owner'] = createHash('sha256').update(requireBearer(request)).digest('hex');
   next();

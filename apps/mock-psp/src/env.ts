@@ -1,26 +1,18 @@
 import { describeIssues, IntegritySchema, SecureUrlSchema } from '@checkout-embed/contracts';
 import { z } from 'zod';
 
-/** Production refuses to boot with this one. */
 const DEV_WEBHOOK_SECRET = 'development-webhook-secret-do-not-ship';
 
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
-  /** A file path, or :memory: for a database that dies with the process. */
   DATABASE_URL: z.string().min(1).default('./data/mock-psp.db'),
-  /** Where the loader is told to fetch the widget bundle from: the plain demo serves it. */
   WIDGET_BUNDLE_URL: SecureUrlSchema.default('http://localhost:5174/sdk/bundle.js'),
-  /** sha384-... of that file. Unset means the loader takes the bundle unpinned. */
   WIDGET_BUNDLE_INTEGRITY: IntegritySchema.optional(),
-  /** Used to build absolute 3DS challenge links, which have to work inside an iframe. */
   PUBLIC_BASE_URL: SecureUrlSchema.default('http://localhost:4000'),
-  /** Unset means webhook deliveries are recorded and never sent. */
   WEBHOOK_URL: SecureUrlSchema.optional(),
   WEBHOOK_SECRET: z.string().min(16).default(DEV_WEBHOOK_SECRET),
-  /** Comma separated. A key outside this list gets a 404 from the config route. */
   MERCHANT_KEYS: z.string().min(1).default('mk_test_acme'),
-  /** Comma separated origins, or * for anyone. Every /v1 call from the widget is cross origin. */
   ALLOWED_ORIGINS: z.string().min(1).default('*'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
@@ -56,8 +48,7 @@ export function loadEnv(source: Readonly<Record<string, string | undefined>>): E
       .filter((entry) => entry.length > 0);
 
   const origins = anyOrigin ? [] : list(parsed.data.ALLOWED_ORIGINS);
-  // cors compares the Origin header as a string, so a trailing slash or a path would
-  // quietly match nothing.
+  // cors compares the Origin header as a string, so a slash or a path would never match
   const malformed = origins.filter((origin) => !isOrigin(origin));
   if (malformed.length > 0) {
     throw new Error(`ALLOWED_ORIGINS has entries that are not origins: ${malformed.join(', ')}`);

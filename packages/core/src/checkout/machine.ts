@@ -2,7 +2,6 @@ import type { PaymentMethod } from '@checkout-embed/contracts';
 import { type Logger, silentLogger } from '../adapters/logger.js';
 import type { CheckoutAction, CheckoutState } from './state.js';
 
-/** A minute and a half at the SDK's 1.5 s interval, plus however long the reads take. */
 export const DEFAULT_MAX_POLL_ATTEMPTS = 60;
 
 type Applied = { readonly next: CheckoutState } | { readonly dropped: string };
@@ -36,8 +35,6 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
       switch (action.type) {
         case 'methods/loaded':
           return { next: { status: 'methods', methods: action.methods } };
-        // A provider that is down before the list ever loads still has to say so. Without
-        // this the widget sits on its loading line for as long as the page is open.
         case 'payment/failed':
           return { next: failed([], action) };
         default:
@@ -81,9 +78,6 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
 
     case 'confirming':
       switch (action.type) {
-        // The provider answered 'processing' rather than handing back a challenge. There
-        // is nothing for anyone to do but wait, which is the same waiting the machine
-        // already knows how to do after a challenge.
         case 'poll/started':
           return {
             next: {
@@ -181,8 +175,6 @@ function apply(state: CheckoutState, action: CheckoutAction, maxPollAttempts: nu
   }
 }
 
-/** An action with no transition from the current state is logged and dropped, and the same
- * state object comes back, so React skips the render. */
 export function createCheckoutReducer(options: CheckoutReducerOptions = {}): CheckoutReducer {
   const logger = options.logger ?? silentLogger;
   const maxPollAttempts = options.maxPollAttempts ?? DEFAULT_MAX_POLL_ATTEMPTS;

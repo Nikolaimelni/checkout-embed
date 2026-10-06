@@ -8,7 +8,6 @@ const LimitsSchema = object({
   maxMinor: int().positive(),
 });
 
-/** Host to widget. Everything the merchant can push into a mounted instance. */
 export const HostMessageSchema = discriminatedUnion('type', [
   object({
     type: literal('host/update'),

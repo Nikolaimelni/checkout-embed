@@ -29,7 +29,7 @@ describe('loadEnv', () => {
   });
 
   it.each(['https://shop.example/', 'https://shop.example/checkout', 'shop.example'])(
-    'refuses %s as an origin, which cors would never match',
+    'refuses %s as an origin',
     (origin) => {
       expect(() => loadEnv({ ALLOWED_ORIGINS: origin })).toThrow(/not origins/);
     },

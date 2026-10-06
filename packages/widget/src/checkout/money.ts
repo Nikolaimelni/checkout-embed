@@ -1,8 +1,6 @@
 import type { Money } from '@checkout-embed/contracts';
 
-// ISO 4217 exponents other than two. Intl cannot supply these: its fraction digits are
-// CLDR's view of how a price looks, and for HUF and IDR it shows none while the provider
-// still counts in hundredths, which put the Pay screen off by a factor of a hundred.
+// Intl's fraction digits are display rules: HUF shows none but is counted in hundredths
 const NO_MINOR_UNIT = new Set(
   'BIF CLP DJF GNF ISK JPY KMF KRW PYG RWF UGX UYI VND VUV XAF XOF XPF'.split(' '),
 );
@@ -16,7 +14,6 @@ function exponentOf(currency: string): number {
   return 2;
 }
 
-/** Minor units in, a display string out, and never the other way round. */
 export function formatMoney(money: Money, locale: string): string {
   const digits = exponentOf(money.currency);
   const format = new Intl.NumberFormat(locale, {

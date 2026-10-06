@@ -43,7 +43,7 @@ describe('the node:sqlite proxy driver', () => {
     expect(found).toEqual([row]);
   });
 
-  it('returns nothing rather than a row of undefined when a get misses', async () => {
+  it('returns no rows when a get misses', async () => {
     const found = await handle.db
       .select()
       .from(paymentIntents)
@@ -66,7 +66,7 @@ describe('the node:sqlite proxy driver', () => {
     expect(found?.createdAt).toBe(1_893_456_000_123);
   });
 
-  it('answers a ping, which is what the health route leans on', () => {
+  it('answers a ping', () => {
     expect(handle.ping()).toBe(true);
   });
 });

@@ -16,7 +16,6 @@ import {
 } from '@checkout-embed/core';
 import type { z } from 'zod';
 
-/** Every call takes a signal, so Back or a teardown cannot leave a confirm in flight. */
 export type CheckoutApi = {
   loadConfig(merchantKey: MerchantKey, signal?: AbortLike): Promise<RemoteWidgetConfig>;
   createIntent(
@@ -48,7 +47,6 @@ function messageOf(response: HttpResponse): string {
     : `The payment provider answered ${response.status}.`;
 }
 
-/** HTTP statuses become a code and a retryable flag here, and nowhere else. */
 function raise(response: HttpResponse): never {
   const message = messageOf(response);
 
@@ -56,7 +54,6 @@ function raise(response: HttpResponse): never {
     throw new CheckoutError('invalid_config', message);
   }
 
-  // 429 is backpressure, not an answer about the payment.
   if (response.status === 429 || response.status >= 500) {
     throw new CheckoutError('network', message, { retryable: true });
   }
@@ -68,7 +65,6 @@ function parse<T>(schema: z.ZodType<T>, response: HttpResponse): T {
   const parsed = schema.safeParse(response.body);
 
   if (!parsed.success) {
-    // The provider answered in a shape this SDK version cannot read.
     throw new CheckoutError(
       'invalid_message',
       'The payment provider answered in a shape this version does not understand.',

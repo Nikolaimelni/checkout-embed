@@ -45,13 +45,11 @@ function page(title: string, body: string, script = ''): string {
 </html>`;
 }
 
-/** The page inside the 3DS iframe. Its postMessage only saves the widget a poll. */
 export function threeDsRouter(service: PaymentsService): Router {
   const router = Router();
 
   router.use((_request, response, next) => {
-    // Framed by merchant pages, so the service-wide headers are replaced here. A real
-    // provider would list the merchant's origins instead of *.
+    // merchant pages frame this one, so it swaps the service-wide headers for its own
     response.removeHeader('X-Frame-Options');
     response.setHeader(
       'Content-Security-Policy',
@@ -68,7 +66,6 @@ export function threeDsRouter(service: PaymentsService): Router {
       await service.openChallenge(params.id, query.token);
       const id = escapeHtml(params.id);
 
-      // The token goes back in the form body, so the POST that moves the payment needs it too.
       response.type('html').send(
         page(
           'Confirm your payment',
@@ -95,7 +92,6 @@ export function threeDsRouter(service: PaymentsService): Router {
 
       const intent = await service.completeChallenge(params.id, body.token, approved);
 
-      // '*' because the mock does not know merchant domains. A real provider pins it.
       const message = JSON.stringify({
         source: 'checkout-embed-3ds',
         intentId: intent.id,

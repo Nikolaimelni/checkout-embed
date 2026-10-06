@@ -8,13 +8,11 @@ export type Database = SqliteRemoteDatabase<typeof schema>;
 
 export type DatabaseHandle = {
   readonly db: Database;
-  /** Applies one migration statement. The migrator needs this, nothing else does. */
   readonly exec: (sql: string) => void;
   readonly ping: () => boolean;
   readonly close: () => void;
 };
 
-/** node:sqlite behind drizzle's proxy driver: no native module to compile on Windows or CI. */
 export function createDatabase(url: string): DatabaseHandle {
   if (url !== ':memory:') mkdirSync(dirname(url), { recursive: true });
 
@@ -31,8 +29,7 @@ export function createDatabase(url: string): DatabaseHandle {
         return { rows: [] };
       }
 
-      // The proxy wants positional rows and node:sqlite returns objects. Object.values would
-      // lose a duplicated column name in a join; there are no joins.
+      // the proxy wants positional rows; this would break on duplicate column names in a join
       const toValues = (row: unknown): unknown[] => Object.values(row as object);
 
       if (method === 'get') {

@@ -15,7 +15,6 @@ export type CheckoutStatus =
   | 'succeeded'
   | 'failed';
 
-/** Each state carries only what its screen needs. failed keeps the methods for a retry. */
 export type CheckoutState =
   | { readonly status: 'idle' }
   | { readonly status: 'methods'; readonly methods: readonly PaymentMethod[] }

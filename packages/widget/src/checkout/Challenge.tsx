@@ -3,7 +3,6 @@ import { boolean, literal, object, string } from 'zod';
 import { Button } from './HostElement.js';
 import type { Labels } from './labels.js';
 
-/** What the mock's challenge page posts when it is done. A hint only: polling decides. */
 const ChallengeResultSchema = object({
   source: literal('checkout-embed-3ds'),
   intentId: string().min(1),
@@ -30,8 +29,6 @@ export function Challenge({
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
-  // Syncs with the top layer: a modal dialog is not clipped by transforms or overflow in the
-  // host page, and focus lands on the labelled dialog first.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -41,13 +38,11 @@ export function Challenge({
     return () => dialog.close();
   }, []);
 
-  // Syncs with the challenge iframe's postMessage.
   useEffect(() => {
     const expectedOrigin = new URL(actionUrl).origin;
 
     const onMessage = (event: MessageEvent): void => {
-      // Origin alone would also let another window of the provider's site, or a second
-      // copy of this widget, finish someone else's challenge.
+      // origin alone would accept any window on the provider's site
       if (event.origin !== expectedOrigin || event.source !== frameRef.current?.contentWindow) {
         return;
       }
@@ -69,7 +64,7 @@ export function Challenge({
       tabIndex={-1}
       ref={dialogRef}
       onCancel={(event) => {
-        // Escape would close the dialog behind the machine's back and leave it waiting.
+        // Escape would close the dialog behind the state machine's back
         event.preventDefault();
         onDismissed();
       }}
@@ -77,8 +72,6 @@ export function Challenge({
       <div className="challenge">
         <h2 className="heading">{labels.challengeTitle}</h2>
         <p className="status">{labels.challengeHint}</p>
-        {/* The bank's page needs scripts, its form and its own origin for postMessage. It
-            does not need to navigate the merchant's page away, which sandbox takes from it. */}
         <iframe
           ref={frameRef}
           className="challenge-frame"

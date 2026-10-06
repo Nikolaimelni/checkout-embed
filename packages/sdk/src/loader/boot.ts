@@ -1,32 +1,25 @@
-/** Ships in the merchant's tag, so it imports nothing that could pull in a validator. The
- * protocol version is a copy, and a test checks it against contracts. */
+// ships in the merchant's tag, so no imports here. A test keeps this in sync with contracts
 export const LOADER_PROTOCOL_VERSION = 1;
 
 export const DEFAULT_GLOBAL_NAME = 'checkoutEmbed';
 
-/** Long enough for a cold backend, short enough that nobody watches a blank box. */
 export const DEFAULT_RESOLVE_TIMEOUT_MS = 3_000;
 
 export type LoaderConfig = {
   readonly merchantKey: string;
   readonly apiBaseUrl: string;
-  /** Used when the backend cannot be reached. Falling back to nothing helps nobody. */
   readonly staticBundleUrl: string | null;
   readonly globalName: string;
   readonly timeoutMs: number;
   readonly nonce: string | null;
 };
 
-/** Calls queue on `q` until the bundle replays them. `v` lets the bundle refuse a queue
- * from an older loader. */
 export type QueueStub = {
   (...args: unknown[]): void;
   q?: unknown[][];
   v?: number;
 };
 
-/** The global is named by an attribute, so access to it goes through these two instead of
- * an index signature on Window. */
 export function readSlot(view: Window, name: string): unknown {
   return (view as unknown as Record<string, unknown>)[name];
 }
@@ -50,7 +43,6 @@ function originOf(url: string, fallback: string): string {
 
 const LOOPBACK = ['localhost', '127.0.0.1', '[::1]'];
 
-/** A copy of isSecureUrl from contracts, for the same reason the version above is a copy. */
 export function isSecureUrl(value: string): boolean {
   try {
     const { protocol, hostname } = new URL(value);
@@ -67,8 +59,6 @@ export function findOwnScript(document: Document): HTMLScriptElement | null {
   const current = document.currentScript;
   if (current instanceof HTMLScriptElement) return current;
 
-  // document.currentScript is null inside a module or when the tag was injected, so fall
-  // back to the attribute that identifies us.
   return document.querySelector<HTMLScriptElement>('script[data-merchant-key]');
 }
 
@@ -84,13 +74,10 @@ export function readConfig(script: HTMLScriptElement, pageOrigin: string): Loade
     staticBundleUrl: attribute(script, 'data-bundle'),
     globalName: attribute(script, 'data-global') ?? DEFAULT_GLOBAL_NAME,
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_RESOLVE_TIMEOUT_MS,
-    // Browsers blank the attribute once the tag is parsed and keep the value only on the
-    // property, which reads as an empty string when there was no nonce at all.
     nonce: attribute(script, 'nonce') ?? (script.nonce || null),
   };
 }
 
-/** Idempotent: a tag pasted twice keeps one queue and whatever is already in it. */
 export function installQueue(view: Window, globalName: string): QueueStub {
   const existing = readSlot(view, globalName) as QueueStub | undefined;
 
@@ -129,8 +116,6 @@ function fallbackOf(config: LoaderConfig): Bundle | null {
 function readBundle(body: unknown): Bundle {
   const { bundleUrl, integrity } = (body ?? {}) as { bundleUrl?: unknown; integrity?: unknown };
 
-  // The script lands on the merchant's page with their nonce, so the address is checked
-  // here and not taken on trust from whatever answered.
   if (typeof bundleUrl !== 'string' || !isSecureUrl(bundleUrl)) {
     throw new Error('the config had no usable bundleUrl');
   }
@@ -141,7 +126,6 @@ function readBundle(body: unknown): Bundle {
   return { url: bundleUrl, integrity: integrity ?? null };
 }
 
-/** Asks the backend where the bundle lives, and falls back to data-bundle when it cannot. */
 export async function resolveBundle(
   config: LoaderConfig,
   options: ResolveOptions,
@@ -182,7 +166,6 @@ export function injectBundle(
   script.dataset['checkoutEmbedGlobal'] = config.globalName;
   if (bundle.integrity !== null) script.integrity = bundle.integrity;
 
-  // Without the merchant's nonce a strict CSP blocks the one script we inject.
   if (config.nonce !== null) script.setAttribute('nonce', config.nonce);
   if (onError) script.addEventListener('error', onError, { once: true });
 
@@ -235,8 +218,6 @@ export async function boot(options: BootOptions): Promise<string | null> {
     return null;
   }
 
-  // The config can answer and still name a file that does not load: a bad deploy, a CDN
-  // outage, an integrity mismatch. data-bundle is the merchant's own copy for that case.
   const fallback = fallbackOf(config);
   injectBundle(document, config, bundle, () => {
     if (fallback === null || fallback.url === bundle.url) {

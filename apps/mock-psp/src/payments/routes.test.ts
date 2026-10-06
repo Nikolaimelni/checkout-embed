@@ -39,7 +39,6 @@ async function createIntent(amountMinor: number, key = `key_${amountMinor}`) {
 const confirm = (id: string, key = `confirm_${id}`, methodId = 'pm_card') =>
   post(`/v1/payment-intents/${id}/confirm`).set('idempotency-key', key).send({ methodId });
 
-/** Confirms a 3DS amount and returns the challenge link as a path with its token. */
 async function challengeFor(id: string): Promise<{ path: string; token: string }> {
   const confirmed = await confirm(id);
   const url = new URL(confirmed.body.actionUrl as string);
@@ -59,7 +58,7 @@ describe('POST /v1/payment-intents', () => {
     expect(response.status).toBe(401);
   });
 
-  it('refuses a request without an idempotency key, because it moves money', async () => {
+  it('refuses a request without an idempotency key', async () => {
     const response = await post('/v1/payment-intents').send(intentBody(SUCCEEDS));
 
     expect(response.status).toBe(400);
@@ -204,7 +203,7 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
     expect(again.body.error.code).toBe('idempotency_conflict');
   });
 
-  it('refuses a confirm without an idempotency key, because it moves money', async () => {
+  it('refuses a confirm without an idempotency key', async () => {
     const intent = await createIntent(SUCCEEDS);
 
     const response = await post(`/v1/payment-intents/${intent.id}/confirm`).send({
@@ -225,7 +224,7 @@ describe('POST /v1/payment-intents/:id/confirm', () => {
 describe('another caller', () => {
   const stranger = 'Bearer someone-else';
 
-  it('cannot read an intent it did not create, even with its id', async () => {
+  it('cannot read an intent it did not create', async () => {
     const intent = await createIntent(SUCCEEDS);
 
     const response = await request(harness.app)
@@ -434,7 +433,7 @@ describe('request ids', () => {
 });
 
 describe('requests that never reach a handler', () => {
-  it('answers malformed json with 400, so the SDK does not retry it as an outage', async () => {
+  it('answers malformed json with 400', async () => {
     const response = await post('/v1/payment-intents')
       .set('idempotency-key', 'key_json')
       .set('content-type', 'application/json')

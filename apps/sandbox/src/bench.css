@@ -75,7 +75,6 @@ code {
   font-weight: 550;
 }
 
-/* Wide screens: order, widget and controls side by side, the way checkout pages lay out. */
 .layout {
   display: grid;
   grid-template-columns: minmax(200px, 1fr) 448px 320px;
@@ -126,7 +125,6 @@ h1 {
   color: var(--muted);
 }
 
-/* Dashed, so it is plain where the shop's page stops and the widget starts. */
 .stage {
   padding: 23px;
   border: 1px dashed #c4c1b8;
@@ -321,7 +319,6 @@ input[role="switch"]:focus-visible {
   border-top: 1px solid var(--line);
 }
 
-/* Medium screens: order above the widget, controls beside both. */
 @media (width <= 1180px) {
   .layout {
     grid-template-columns: minmax(0, 448px) minmax(280px, 340px);
@@ -342,7 +339,6 @@ input[role="switch"]:focus-visible {
   }
 }
 
-/* Phones: one column, the order compact so the widget is near the top. */
 @media (width <= 760px) {
   .layout {
     grid-template-columns: minmax(0, 1fr);

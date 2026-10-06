@@ -4,14 +4,13 @@ const HEADER = 'x-checkout-signature';
 
 export const SIGNATURE_HEADER = HEADER;
 
-/** Five minutes each way. Long enough for a slow queue, short enough to matter. */
 export const DEFAULT_TOLERANCE_SECONDS = 300;
 
 function digest(payload: string, secret: string, timestamp: number): string {
   return createHmac('sha256', secret).update(`${timestamp}.${payload}`).digest('hex');
 }
 
-/** The timestamp is signed too, or a captured delivery could be replayed forever. */
+// the timestamp is signed too, so a captured delivery cannot be replayed later
 export function signPayload(payload: string, secret: string, timestampSeconds: number): string {
   return `t=${timestampSeconds},v1=${digest(payload, secret, timestampSeconds)}`;
 }
@@ -52,6 +51,5 @@ export function verifySignature(
   const expected = Buffer.from(digest(payload, secret, parsed.timestamp), 'utf8');
   const received = Buffer.from(parsed.v1, 'utf8');
 
-  // timingSafeEqual needs equal lengths, and the length gives nothing away.
   return expected.length === received.length && timingSafeEqual(expected, received);
 }

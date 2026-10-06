@@ -96,7 +96,7 @@ describe('the challenge', () => {
     expect(onIntent).toHaveBeenCalledWith({ type: 'challenge-dismissed' });
   });
 
-  it('treats Escape as walking away rather than closing the dialog behind the machine', () => {
+  it('treats Escape as walking away', () => {
     const onIntent = show(states.requires_action);
     const dialog = screen.getByRole('dialog');
 
@@ -224,15 +224,13 @@ describe('what the host pushes in', () => {
       blockingMessage: 'Your account is under review.',
     });
 
-    // Twice on purpose: once where it can be seen, once in the live region that
-    // announces it. The selector picks the visible one.
     expect(
       screen.getByText('Your account is under review.', { selector: '.failure' }),
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: /^Card$/ })).not.toBeInTheDocument();
   });
 
-  it('announces the block rather than the screen behind it', () => {
+  it('announces the block', () => {
     showWith(states.methods, { ...empty, blockingMessage: 'Under review.' });
 
     expect(screen.getByRole('status')).toHaveTextContent('Under review.');

@@ -34,8 +34,6 @@ function spyLogger(): { logger: Logger; entries: LogEntry[] } {
   };
 }
 
-// Through parse rather than a cast: ids are branded, and a fixture that skips the schema
-// would also skip the only thing keeping a method id out of an intent id's slot.
 const card = PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' });
 const wallet = PaymentMethodSchema.parse({
   id: 'pm_wallet',
@@ -88,10 +86,6 @@ const ACTIONS: {
   'checkout/reset': { type: 'checkout/reset' },
 };
 
-/**
- * Written out by hand rather than imported from the reducer. A table the implementation
- * also owns would agree with itself no matter what the implementation did.
- */
 const EXPECTED: Readonly<
   Record<CheckoutStatus, Partial<Record<CheckoutActionType, CheckoutStatus>>>
 > = {

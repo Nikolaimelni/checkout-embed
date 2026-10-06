@@ -4,19 +4,16 @@ const REACT = ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'];
 
 export default defineConfig([
   {
-    // For anyone installing from npm. React stays a peer dependency, because a library
-    // that ships its own copy gives the host page two Reacts and one very confusing bug.
     entry: ['src/index.ts'],
     format: ['esm'],
     target: 'es2023',
     sourcemap: true,
     clean: true,
+    // tsup's dts step bundles TypeScript 5.7 and fails on 7, so tsc writes the .d.ts
     dts: false,
     external: REACT,
   },
   {
-    // For the browser. A module script cannot resolve a bare specifier, so this one carries
-    // everything it needs and is the only build where bundling React is the right answer.
     entry: { bundle: 'src/bundle.ts' },
     format: ['esm'],
     target: 'es2020',
@@ -30,8 +27,7 @@ export default defineConfig([
   {
     entry: { loader: 'src/loader/loader.ts' },
     format: ['iife'],
-    // Older than the rest: this runs first on any browser a shopper has, and has to live long
-    // enough to warn that it cannot help.
+    // older than the rest: the loader has to run on whatever browser shows up
     target: 'es2018',
     minify: true,
     sourcemap: true,

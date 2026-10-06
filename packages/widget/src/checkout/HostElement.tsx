@@ -4,14 +4,11 @@ function isDefined(name: string): boolean {
   return typeof customElements !== 'undefined' && customElements.get(name) !== undefined;
 }
 
-/** The tag name once the host has registered it, null until then. Lazily hydrated pages
- * register late, so this waits instead of checking once. */
 export function useHostElement(name: string | undefined): string | null {
   const [resolved, setResolved] = useState<string | null>(() =>
     name !== undefined && isDefined(name) ? name : null,
   );
 
-  // Syncs with the custom element registry, which can gain the tag at any moment.
   useEffect(() => {
     if (name === undefined) {
       setResolved(null);
@@ -56,12 +53,11 @@ export function Button({
   const className = variant === 'primary' ? 'button' : 'button secondary';
 
   if (tag !== null) {
-    // why: the tag name is a runtime string from the merchant's config, so there is no
-    // union of literal element names for TypeScript to check it against.
+    // why: the tag name comes from the merchant's config at runtime, not from JSX types
     const Host = tag as unknown as ElementType;
 
-    // No disabled="false", which a custom element reads as disabled, and no handler, since a
-    // custom element ignores the attribute when clicked.
+    // a custom element reads disabled="false" as disabled and ignores the attribute on click,
+    // so the attribute is dropped when false and the handler goes when true
     return (
       <Host
         className={className}

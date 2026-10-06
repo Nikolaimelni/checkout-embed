@@ -42,7 +42,6 @@ export function notFoundHandler(_request: Request, response: Response): void {
     .json({ error: { code: 'not_found', message: 'No route matches this path.' } });
 }
 
-/** express.json() throws http-errors objects. A 4xx there is the client's, and 500 would make the SDK retry. */
 function fromBodyParser(error: unknown): ApiError | null {
   if (!(error instanceof Error) || !('status' in error)) return null;
 
@@ -56,7 +55,6 @@ function fromBodyParser(error: unknown): ApiError | null {
   return null;
 }
 
-/** Anything that is not an ApiError is a bug, answered without leaking its message. */
 export function errorHandler(
   error: unknown,
   _request: Request,

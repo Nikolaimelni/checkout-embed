@@ -5,8 +5,6 @@ type Props = {
   readonly method: PaymentMethod;
 };
 
-// Drawn rather than taken from the networks' brand kits: a mark shaped like the real one is
-// enough to scan a list by, and nobody's trademark ships inside the bundle.
 export function MethodIcon({ method }: Props): ReactNode {
   if (method.kind === 'saved_card' && method.brand) {
     return (

@@ -19,7 +19,7 @@ describe('buildOpenApiDocument', () => {
     expect(document.paths[path]).toBeDefined();
   });
 
-  it('derives the schemas from Zod rather than restating them', () => {
+  it('derives the schemas from Zod', () => {
     const intent = document.components.schemas['PaymentIntent'] ?? {};
     const properties = intent['properties'] as Record<string, unknown>;
 
@@ -36,13 +36,13 @@ describe('buildOpenApiDocument', () => {
     }
   });
 
-  it('carries no $schema key, which OpenAPI does not want inside components', () => {
+  it('carries no $schema key', () => {
     for (const schema of Object.values(document.components.schemas)) {
       expect(schema['$schema']).toBeUndefined();
     }
   });
 
-  it('lists every trigger amount, so the docs cannot drift from the behaviour', () => {
+  it('lists every trigger amount', () => {
     for (const trigger of TRIGGERS) {
       expect(document.info.description).toContain((trigger.amountMinor / 100).toFixed(2));
       expect(document.info.description).toContain(trigger.outcome);

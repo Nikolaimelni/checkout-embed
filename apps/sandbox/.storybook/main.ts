@@ -4,7 +4,6 @@ const config: StorybookConfig = {
   stories: ['../src/**/*.stories.tsx'],
   framework: { name: '@storybook/react-vite', options: {} },
   addons: [],
-  // A portfolio repo should not phone home on somebody else's machine.
   core: { disableTelemetry: true },
 };
 

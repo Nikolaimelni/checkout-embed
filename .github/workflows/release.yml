@@ -1,6 +1,6 @@
 name: release
 
-# After ci passes on main, never instead of it: a red build does not reach the registry.
+# Runs only after ci passes on main.
 on:
   workflow_run:
     workflows: [ci]
@@ -18,8 +18,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      # Trusted publishing: npm trades this for a short-lived token and signs provenance
-      # against this run, so the repository keeps no npm token at all.
+      # npm trusted publishing, so no npm token lives in the repo
       id-token: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -37,8 +36,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Opens a release pull request while changesets are pending, and publishes once that
-      # pull request is merged. pnpm release builds first.
       - uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
         with:
           publish: pnpm release

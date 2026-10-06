@@ -22,24 +22,20 @@ export type AppOptions = {
   readonly bundleUrl: string;
   readonly bundleIntegrity?: string | undefined;
   readonly publicBaseUrl: string;
-  /** Origins allowed to call /v1, or '*' for anyone. */
   readonly allowedOrigins: readonly string[] | '*';
-  /** False in tests, where a shared counter across cases is just a source of flakiness. */
   readonly rateLimit?: RateLimitOptions | false;
 };
 
 export function createApp(options: AppOptions): Express {
   const app = express();
 
-  // One hop, because this runs behind a single load balancer. Left at true the rate
-  // limiter would trust a client supplied X-Forwarded-For and count everyone as one caller.
+  // one hop; true would let a client spoof X-Forwarded-For past the rate limiter
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
   app.use(
     helmet({
-      // X-Frame-Options is the blunt version of frame-ancestors and there is no way to
-      // scope it per route without removing it, which the 3DS router does anyway.
+      // X-Frame-Options cannot be scoped per route, and the 3DS page has to be framed
       frameguard: false,
       contentSecurityPolicy: {
         directives: {
@@ -69,17 +65,12 @@ export function createApp(options: AppOptions): Express {
     }
   });
 
-  // An embedded checkout runs on the merchant's origin and calls this one, so every /v1
-  // request is cross origin and every one of them is preflighted: the SDK sends both
-  // Authorization and Idempotency-Key, neither of which is a simple header.
   app.use(
     '/v1',
     cors({
       origin: options.allowedOrigins === '*' ? true : [...options.allowedOrigins],
       methods: ['GET', 'POST', 'OPTIONS'],
       allowedHeaders: ['authorization', 'content-type', 'idempotency-key', 'x-request-id'],
-      // Bearer tokens, not cookies. Allowing credentials would rule out the '*' origin
-      // and buy nothing.
       credentials: false,
       maxAge: 600,
     }),
@@ -87,15 +78,12 @@ export function createApp(options: AppOptions): Express {
 
   const limits = options.rateLimit ?? { windowMs: 60_000, limit: 120 };
   if (limits !== false) {
-    // The 3DS pages too: they are public and the complete route moves a payment.
     app.use(
       ['/v1', '/3ds'],
       rateLimit({
         ...limits,
         standardHeaders: 'draft-7',
         legacyHeaders: false,
-        // The default answer is a line of text/html, the one reply on /v1 an SDK could not
-        // read as an error.
         handler: (_request, _response, next) => {
           next(new ApiError('rate_limited', 'Too many requests. Wait a moment and try again.'));
         },

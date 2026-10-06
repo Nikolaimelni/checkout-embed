@@ -19,7 +19,6 @@ export const FAKE_BUNDLE = 'https://cdn.test/checkout.js';
 export const FAKE_CHALLENGE = 'https://psp.test/3ds/pi_fake';
 
 export type FakePspOptions = {
-  /** What confirm answers with. Everything else follows from that. */
   readonly confirmStatus?: PaymentIntentStatus;
   readonly configStatus?: number;
 };
@@ -33,10 +32,6 @@ function json(status: number, body: unknown): Response {
   return { status, ok: status < 400, text: async () => JSON.stringify(body) } as Response;
 }
 
-/**
- * Enough of the mock provider to drive the SDK without a server. The real one is covered
- * by its own tests; what matters here is the shape of the answers.
- */
 export function createFakePsp(options: FakePspOptions = {}): FakePsp {
   const confirmStatus = options.confirmStatus ?? 'succeeded';
   const calls: string[] = [];

@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import { int, object, string } from 'zod';
 
-/** Minor units only. The widget's formatter is the one place a decimal appears. */
 export const MoneySchema = object({
   amountMinor: int().nonnegative(),
   currency: string().regex(/^[A-Z]{3}$/, { error: 'expected an ISO 4217 alphabetic code' }),

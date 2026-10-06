@@ -1,13 +1,11 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { INSTRUMENT, outstanding } from './leaks.ts';
 
-/** The provider picks an outcome from the amount, so the amounts are the scenarios. */
 const SUCCEEDS = 4999;
 const DECLINES = 1051;
 const NEEDS_3DS = 1003;
 const STALLS = 1099;
 
-/** Everything the widget renders lives in a shadow root, which Playwright pierces for us. */
 const widget = (page: Page): Locator => page.locator('#checkout');
 
 async function open(page: Page, amountMinor: number): Promise<void> {
@@ -19,8 +17,6 @@ test.describe('a shop page with no framework', () => {
   test('loads the widget through the loader and the config endpoint', async ({ page }) => {
     await open(page, SUCCEEDS);
 
-    // The bundle address came from the provider, not from the tag: data-bundle is the
-    // fallback, and only the address the config route hands out carries the marker.
     await expect(page.locator('script[data-checkout-embed-global]')).toHaveAttribute(
       'src',
       /from=config/,
@@ -34,12 +30,9 @@ test.describe('a shop page with no framework', () => {
     await widget(page).getByRole('button', { name: 'Card', exact: true }).click();
     await widget(page).getByRole('button', { name: 'Pay' }).click();
 
-    // Through the live region: it is the accessible handle for status, and it says the
-    // same thing as the visible line without depending on a class name.
     await expect(widget(page).getByRole('status')).toHaveText('Payment complete', {
       timeout: 15_000,
     });
-    // The host page heard about it, which is the only part of this a merchant writes.
     await expect(page.locator('#receipt')).toContainText('Paid. Reference pi_');
   });
 
@@ -62,8 +55,6 @@ test.describe('a shop page with no framework', () => {
     const dialog = widget(page).getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    // The challenge is a document from the provider's origin, framed by the merchant's
-    // page. Reaching into it at all is the thing being tested.
     const challenge = page.frameLocator('#checkout iframe');
     await expect(challenge.getByRole('heading', { name: /confirm your payment/i })).toBeVisible();
 
@@ -95,7 +86,7 @@ test.describe('style isolation', () => {
     button { background: #ff00ff !important; padding: 40px !important; }
   `;
 
-  test('a host page cannot reach into the widget, even with !important', async ({ page }) => {
+  test('a host page cannot reach into the widget', async ({ page }) => {
     await open(page, SUCCEEDS);
 
     const sample = () =>
@@ -125,7 +116,6 @@ test.describe('style isolation', () => {
     const before = await sample();
 
     await page.addStyleTag({ content: HOSTILE });
-    // Give the page a frame to recalculate before reading anything back.
     await page.waitForTimeout(100);
 
     const after = await sample();
@@ -133,7 +123,6 @@ test.describe('style isolation', () => {
     expect(after.card).toEqual(before.card);
     expect(after.heading).toEqual(before.heading);
     expect(after.method).toEqual(before.method);
-    // And the page around it really did change, so the comparison above means something.
     expect(after.hostPage).not.toEqual(before.hostPage);
   });
 });
@@ -145,8 +134,6 @@ test.describe('teardown', () => {
     await page.addInitScript(INSTRUMENT);
     await open(page, STALLS);
 
-    // Torn down while polling a payment that never settles: a poll timer that is pending
-    // and a read that is on the wire are what a teardown most easily leaves behind.
     const payAndWait = async (): Promise<void> => {
       await widget(page).getByRole('button', { name: 'Card', exact: true }).click();
       await widget(page).getByRole('button', { name: 'Pay' }).click();
@@ -191,8 +178,6 @@ test.describe('teardown', () => {
     await payAndWait();
     const second = await terminate();
 
-    // A leak accumulates by definition. Two identical cycles that end on the same counts
-    // are the only version of this claim a browser can actually settle.
     expect(second.nodes).toBe(0);
     expect(second.timers).toBe(first.timers);
     expect(second.listeners).toBe(first.listeners);

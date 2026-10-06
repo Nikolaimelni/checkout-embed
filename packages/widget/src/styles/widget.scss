@@ -1,12 +1,9 @@
-// Scoped by the shadow root, so the selectors stay short.
 
 $radius: 18px;
 $radius-inner: 14px;
 $font: system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
 
 :host {
-  // Public: a merchant can set any of these on the host element to bring the widget
-  // closer to their brand.
   --ce-surface: #fff;
   --ce-surface-sunken: #f4f4f1;
   --ce-surface-hover: #ebebe6;
@@ -42,9 +39,8 @@ $font: system-ui, -apple-system, "Segoe UI", roboto, sans-serif;
   box-sizing: border-box;
 }
 
+// the reset again: !important in the page beats :host, but nothing in the page can select .root
 .root {
-  // The reset lives here as well as on :host: an !important rule in the page beats :host,
-  // and this is the first element the page has no selector for.
   all: initial;
   display: flex;
   flex-direction: column;
@@ -316,8 +312,6 @@ ul {
   border-radius: 12px;
 }
 
-// The dialog sits in the top layer but still inherits from .root through the DOM. The
-// browser's own dialog colours are what it has to override.
 .dialog {
   width: calc(100% - 32px);
   max-width: 440px;
@@ -328,13 +322,12 @@ ul {
   border-radius: 20px;
   box-shadow: 0 24px 60px rgb(17 18 21 / 24%);
 
-  // Literal rather than a token: older engines do not pass custom properties to ::backdrop.
+  // a literal, older engines do not pass custom properties to ::backdrop
   &::backdrop {
     background: rgb(17 18 21 / 48%);
   }
 }
 
-// Visible focus is not optional on a payment form, and the host page's reset will not help.
 :focus-visible {
   outline: 2px solid var(--ce-focus);
   outline-offset: 2px;

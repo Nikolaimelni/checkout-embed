@@ -25,7 +25,6 @@ export function isCheckoutError(value: unknown): value is CheckoutError {
   return value instanceof CheckoutError;
 }
 
-/** Takes unknown, since anything can be thrown. */
 export function toFailure(value: unknown): CheckoutFailure {
   if (isCheckoutError(value)) return value.toFailure();
   if (value instanceof Error) return { code: 'unknown', message: value.message || value.name };

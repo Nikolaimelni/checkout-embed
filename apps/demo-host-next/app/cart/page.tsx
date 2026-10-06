@@ -4,8 +4,7 @@ import { pspUrl } from '../../env';
 
 const AMOUNT = { amountMinor: 4999, currency: 'EUR' } as const;
 
-// Imported straight into a server component, no next/dynamic. If the SDK stops being safe
-// to import on a server, this page stops building.
+// no next/dynamic: if this page fails to build, the SDK broke on the server
 export default function Cart() {
   return (
     <>

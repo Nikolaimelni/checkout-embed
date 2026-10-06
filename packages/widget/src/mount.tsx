@@ -36,7 +36,6 @@ type Instance = {
 
 const instances = new WeakMap<Element, Instance>();
 
-/** Shadow roots cannot be detached, so a host we have mounted before keeps the one it has. */
 const ourRoots = new WeakMap<Element, ShadowRoot>();
 
 type Props = {
@@ -79,9 +78,6 @@ function shadowFor(host: Element): ShadowRoot {
     ourRoots.set(host, created);
     return created;
   } catch (cause) {
-    // Translated, not logged and rethrown: an <input> or an <img> cannot host a shadow
-    // root, and a merchant who passed the wrong element deserves better than
-    // NotSupportedError with no context.
     throw new CheckoutError(
       'invalid_config',
       `<${host.localName}> cannot host a shadow root. Mount into a plain element such as a div.`,
@@ -90,8 +86,6 @@ function shadowFor(host: Element): ShadowRoot {
   }
 }
 
-/** Idempotent: StrictMode runs a merchant's effect twice, and the second call updates the
- * widget already there. */
 export function mountWidget(host: Element, input: WidgetInput): WidgetView {
   const existing = instances.get(host);
   if (existing) {
@@ -114,12 +108,10 @@ export function mountWidget(host: Element, input: WidgetInput): WidgetView {
     unmount() {
       instances.delete(host);
 
-      // The container goes at once, so the shadow root is empty the moment this returns.
       disposeStyles();
       container.remove();
 
-      // React warns about unmounting a root mid-render, which is what a host's effect cleanup
-      // does. Waiting a microtask costs nothing.
+      // react warns about unmounting a root during someone else's render
       queueMicrotask(() => root.unmount());
     },
   };

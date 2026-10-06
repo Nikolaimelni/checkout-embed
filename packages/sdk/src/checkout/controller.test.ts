@@ -74,7 +74,6 @@ function harness(api: Partial<CheckoutApi>, overrides: Partial<ControllerOptions
     ...overrides,
   });
 
-  /** Fires every timer the controller has queued, in order. */
   const flushTimers = async (rounds = 1): Promise<void> => {
     for (let round = 0; round < rounds; round += 1) {
       const pending = timers.splice(0);
@@ -108,7 +107,7 @@ describe('start', () => {
     expect(controller.getState()).toMatchObject({ status: 'details', method: card });
   });
 
-  it('reports a provider it cannot reach as a failure rather than an empty screen', async () => {
+  it('reports a provider it cannot reach as a failure', async () => {
     const { controller, seen } = harness({
       loadConfig: async () => {
         throw new CheckoutError('network', 'offline', { retryable: true });
@@ -144,7 +143,7 @@ describe('paying', () => {
     expect(base.seen).toContainEqual({ type: 'method:selected', methodId: card.id });
   });
 
-  it('creates and confirms with one idempotency key, then reports success', async () => {
+  it('creates and confirms with one idempotency key', async () => {
     const createIntent = vi.fn(async () => intent());
     const { controller, seen } = harness({
       createIntent,
@@ -166,7 +165,7 @@ describe('paying', () => {
     expect(seen).toContainEqual({ type: 'payment:success', intentId: 'pi_1', money: total });
   });
 
-  it('confirms under a key of its own, so a replayed confirm cannot charge twice', async () => {
+  it('confirms under a key of its own', async () => {
     const confirmIntent = vi.fn(async () => intent({ status: 'succeeded' }));
     const { controller } = harness({ confirmIntent });
     controller.start();
@@ -421,7 +420,7 @@ describe('a payment already on the wire', () => {
 });
 
 describe('the 3DS challenge', () => {
-  it('fails as abandoned when the customer closes it, and reopens it on retry', async () => {
+  it('fails as abandoned when the customer closes it', async () => {
     const challenge = intent({ status: 'requires_action', actionUrl: CHALLENGE });
     const { controller, seen } = harness({
       confirmIntent: async () => challenge,
@@ -500,7 +499,7 @@ describe('closing a payment that has not finished', () => {
     expect(controller.getState()).toMatchObject({ status: 'requires_action' });
   });
 
-  it('follows the earlier intent instead of opening a second one for another method', async () => {
+  it('follows the earlier intent', async () => {
     const createIntent = vi.fn(async () => intent());
     const readIntent = vi.fn(async () => challenge);
     const { controller } = harness({

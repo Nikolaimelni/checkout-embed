@@ -68,7 +68,7 @@ describe('createEventBus', () => {
     expect(third).toHaveBeenCalledOnce();
   });
 
-  it('drops everything on clear, which is what terminate() leans on', () => {
+  it('drops everything on clear', () => {
     const bus = createEventBus();
     const listener = vi.fn();
 

@@ -1,6 +1,5 @@
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-/** Timestamps are epoch milliseconds. SQLite has no date type. */
 export const paymentIntents = sqliteTable('payment_intents', {
   id: text('id').primaryKey(),
   merchantKey: text('merchant_key').notNull(),
@@ -9,19 +8,14 @@ export const paymentIntents = sqliteTable('payment_intents', {
   methodId: text('method_id'),
   status: text('status').notNull(),
   actionUrl: text('action_url'),
-  /** When a processing intent is allowed to settle. Null while nothing is pending. */
   settleAt: integer('settle_at'),
-  /** The outcome the trigger amount picked, decided once at creation. */
   outcome: text('outcome').notNull(),
-  /** sha256 of the bearer token that created it. Rows from before the column match no one. */
   ownerHash: text('owner_hash'),
-  /** The secret in the 3DS link, set while a challenge is open and cleared once it is used. */
   challengeToken: text('challenge_token'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
 
-/** Scoped per merchant, the way real providers scope them per account. */
 export const idempotencyKeys = sqliteTable(
   'idempotency_keys',
   {

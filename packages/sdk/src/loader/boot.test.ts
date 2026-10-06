@@ -36,8 +36,6 @@ afterEach(() => {
 
 describe('the protocol version baked into the loader', () => {
   it('matches the one in contracts', () => {
-    // The loader carries a copy because it must not import a validator. Copies drift, so
-    // this is the thing that stops them.
     expect(LOADER_PROTOCOL_VERSION).toBe(PROTOCOL_VERSION);
   });
 });
@@ -106,7 +104,7 @@ describe('readConfig', () => {
     expect(readConfig(script, 'https://shop.test')?.nonce).toBe('r4nd0m');
   });
 
-  it('reads no nonce off a tag that has none, where the property is an empty string', () => {
+  it('reads no nonce off a tag that has none', () => {
     const script = tag({ 'data-merchant-key': 'mk_test' });
     Object.defineProperty(script, 'nonce', { value: '' });
 
@@ -262,7 +260,7 @@ describe('boot', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
-  it('passes a nonce on to the script it injects, or a strict page blocks it', async () => {
+  it('passes a nonce on to the script it injects', async () => {
     tag({ 'data-merchant-key': 'mk_test', 'data-api-base': 'https://api.test', nonce: 'r4nd0m' });
 
     await boot({
@@ -341,8 +339,6 @@ describe('boot', () => {
     });
 
     expect(url).toBeNull();
-    // The queue matters more than the bundle here: a merchant calling init() into thin air
-    // would throw and take their checkout page with it.
     expect(typeof readSlot(window, DEFAULT_GLOBAL_NAME)).toBe('function');
     expect(warn).toHaveBeenCalled();
   });

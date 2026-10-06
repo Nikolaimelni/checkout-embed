@@ -8,7 +8,6 @@ import { createWebhookDispatcher } from '../webhooks/dispatcher.ts';
 import { createWebhookQueue } from '../webhooks/queue.ts';
 import { createApp } from './app.ts';
 
-/** How long a request gets to finish once the process has been asked to stop. */
 const DRAIN_TIMEOUT_MS = 10_000;
 
 const logger = createRootLogger(env.LOG_LEVEL);
@@ -47,7 +46,6 @@ const server = app.listen(env.PORT, () => {
 
 dispatcher.start();
 
-// Intents settle on read, but a payment nobody is watching still has to fire its webhook.
 const settler = setInterval(() => {
   void payments.settleDue().catch((cause: unknown) => {
     logger.error({ err: cause }, 'settling due intents failed');

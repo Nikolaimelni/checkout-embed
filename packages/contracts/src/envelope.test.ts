@@ -40,7 +40,7 @@ describe('readEnvelope', () => {
     });
   });
 
-  it('refuses a missing protocol version rather than assuming the current one', () => {
+  it('refuses a missing protocol version', () => {
     const raw = { source: MESSAGE_SOURCE, id: 'msg_1', sentAt: seal.sentAt, payload: {} };
 
     expect(readEnvelope(WidgetEventSchema, raw)).toMatchObject({ reason: 'protocol_mismatch' });
@@ -64,7 +64,7 @@ describe('readEnvelope', () => {
     }
   });
 
-  it('rejects an unknown payload type instead of passing it through', () => {
+  it('rejects an unknown payload type', () => {
     const raw = sealEnvelope({ type: 'payment:refunded' } as unknown as never, seal);
 
     expect(readEnvelope(WidgetEventSchema, raw)).toMatchObject({ reason: 'malformed' });

@@ -6,7 +6,6 @@ function ownerWindow(root: ShadowRoot): StyleWindow {
   return (root.ownerDocument.defaultView ?? globalThis) as StyleWindow;
 }
 
-/** jsdom and Safari before 16.4 have no constructable sheets, so the fallback is a real path. */
 export function supportsConstructableStyleSheets(view: StyleWindow): boolean {
   return (
     typeof view.CSSStyleSheet === 'function' &&
@@ -15,7 +14,6 @@ export function supportsConstructableStyleSheets(view: StyleWindow): boolean {
   );
 }
 
-/** One sheet per window and stylesheet, shared by every root that adopts it. */
 const sheets = new WeakMap<StyleWindow, Map<string, CSSStyleSheet>>();
 
 function sheetFor(view: StyleWindow, css: string): CSSStyleSheet {

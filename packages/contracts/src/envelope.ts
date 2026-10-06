@@ -28,7 +28,6 @@ export type SealOptions = {
   readonly sentAt: string;
 };
 
-/** The caller supplies the id and the clock, so this stays pure. */
 export function sealEnvelope<TPayload>(
   payload: TPayload,
   { id, sentAt }: SealOptions,
@@ -37,11 +36,8 @@ export function sealEnvelope<TPayload>(
 }
 
 export type EnvelopeRejection =
-  /** Someone else's message on a shared channel. Not an error, and not worth a log line. */
   | { readonly reason: 'foreign' }
-  /** Ours, but from a loader we cannot talk to. Worth a log line and nothing else. */
   | { readonly reason: 'protocol_mismatch'; readonly received: unknown; readonly expected: number }
-  /** Ours, right version, wrong shape. Someone shipped a bug, ours or theirs. */
   | { readonly reason: 'malformed'; readonly issues: readonly string[] };
 
 export type EnvelopeRead<TPayload> =
@@ -52,8 +48,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** Source, version, shape, in that order: foreign traffic is dropped silently, and a stale
- * loader is refused before its payload is read. */
 export function readEnvelope<TPayload>(
   payloadSchema: z.ZodType<TPayload>,
   raw: unknown,

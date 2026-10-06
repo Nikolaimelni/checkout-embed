@@ -15,7 +15,7 @@ describe('PaymentIntentSchema', () => {
   });
 
   it.each(['data:text/html,<p>bank</p>', 'http://acs.example.com/challenge'])(
-    'rejects a challenge at %s, which would be framed on the merchant page',
+    'rejects a challenge at %s',
     (actionUrl) => {
       expect(
         PaymentIntentSchema.safeParse({ ...base, status: 'requires_action', actionUrl }).success,
@@ -29,7 +29,7 @@ describe('PaymentIntentSchema', () => {
 });
 
 describe('isTerminalIntentStatus', () => {
-  it('treats canceled as terminal, which is the one people forget', () => {
+  it('treats canceled as terminal', () => {
     expect(isTerminalIntentStatus('canceled')).toBe(true);
     expect(isTerminalIntentStatus('processing')).toBe(false);
   });

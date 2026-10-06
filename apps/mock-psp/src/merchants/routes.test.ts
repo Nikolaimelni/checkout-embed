@@ -27,7 +27,7 @@ describe('GET /v1/config/:merchantKey', () => {
     expect(response.body.methods.length).toBeGreaterThan(0);
   });
 
-  it('does not need a bearer token, because the loader has none yet', async () => {
+  it('does not need a bearer token', async () => {
     const response = await request(harness.app).get(`/v1/config/${MERCHANT_KEY}`);
 
     expect(response.status).toBe(200);

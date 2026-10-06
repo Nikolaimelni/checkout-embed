@@ -17,7 +17,6 @@ export type FetchHttpOptions = {
 
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 
-/** The timeout is ours and the cancel is the caller's. Either one aborts the request. */
 function linkAbort(controller: AbortController, signal: AbortLike | undefined): () => void {
   if (!signal) return () => {};
   if (signal.aborted) {
@@ -43,7 +42,6 @@ async function readBody(response: Response): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    // A gateway can answer with an HTML page. The status is still worth passing on.
     return { raw: text };
   }
 }
@@ -74,7 +72,7 @@ export function createFetchHttp(options: FetchHttpOptions): HttpAdapter {
     }, timeoutMs);
 
     try {
-      // The token shares the timeout, or a callback that never settles hangs the payment.
+      // the token callback shares the timeout, or a hung callback hangs the payment
       const token = await Promise.race([
         requestToken(forceRefresh),
         rejectOnAbort(controller.signal),
@@ -123,7 +121,6 @@ export function createFetchHttp(options: FetchHttpOptions): HttpAdapter {
     async send(request) {
       const first = await send(request, false);
 
-      // One retry, only after a 401, with a token the merchant mints fresh.
       if (first.status !== 401) return first;
 
       return send(request, true);

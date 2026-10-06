@@ -8,15 +8,6 @@ class StandInSheet {
   }
 }
 
-/**
- * jsdom has no constructable stylesheets, so without this the branch that uses them never
- * runs and only the fallback is ever tested. This installs the smallest surface the
- * adoption code looks at, and hands back a function that puts the environment back.
- *
- * It is a stand-in, not a polyfill: it proves the code takes the right branch and shares
- * one sheet, and says nothing about whether a real browser applies the styles. Playwright
- * answers that.
- */
 export function installConstructableStyleSheets(view: StyleWindow): () => void {
   const adopted = new WeakMap<ShadowRoot, CSSStyleSheet[]>();
   const original = view.CSSStyleSheet;
@@ -29,7 +20,6 @@ export function installConstructableStyleSheets(view: StyleWindow): () => void {
     writable: true,
   });
 
-  // Only the feature detection reads this one.
   Object.defineProperty(documentPrototype, 'adoptedStyleSheets', {
     value: [],
     configurable: true,

@@ -5,7 +5,6 @@ import { Button } from './HostElement.js';
 
 let counter = 0;
 
-/** A fresh tag per case: the registry is global and refuses to hear a name twice. */
 function uniqueTag(): string {
   counter += 1;
   return `acme-button-${counter}`;
@@ -77,7 +76,7 @@ describe('Button', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
-  it('leaves disabled off the host component rather than setting it to false', () => {
+  it('leaves disabled off the host component', () => {
     const tag = uniqueTag();
     define(tag);
 
@@ -87,7 +86,6 @@ describe('Button', () => {
       </Button>,
     );
 
-    // disabled="false" is still disabled to an element that only checks for the attribute.
     expect(container.querySelector(tag)?.hasAttribute('disabled')).toBe(false);
   });
 

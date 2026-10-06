@@ -6,7 +6,7 @@ describe('outcomeFor', () => {
     expect(outcomeFor(amountMinor)).toBe(outcome);
   });
 
-  it('lets every other amount through, so the demo is not a minefield', () => {
+  it('lets every other amount through', () => {
     expect(outcomeFor(4200)).toBe('succeed');
     expect(outcomeFor(0)).toBe('succeed');
   });

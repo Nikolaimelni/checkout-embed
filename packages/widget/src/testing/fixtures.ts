@@ -6,7 +6,6 @@ import {
 } from '@checkout-embed/contracts';
 import type { CheckoutState } from '@checkout-embed/core';
 
-// Through parse rather than a cast, so the branded ids are real ones.
 export const card = PaymentMethodSchema.parse({ id: 'pm_card', kind: 'card', label: 'Card' });
 
 export const savedCard = PaymentMethodSchema.parse({

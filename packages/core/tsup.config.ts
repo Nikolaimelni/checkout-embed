@@ -7,6 +7,6 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   external: ['@checkout-embed/contracts'],
-  // Declarations come from tsc. See the note in the contracts package.
+  // tsup's dts step bundles TypeScript 5.7 and fails on 7, so tsc writes the .d.ts
   dts: false,
 });

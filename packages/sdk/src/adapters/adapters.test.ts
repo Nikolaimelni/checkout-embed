@@ -71,7 +71,7 @@ describe('createFetchHttp', () => {
     expect(getToken).toHaveBeenNthCalledWith(2, { forceRefresh: true });
   });
 
-  it('gives up after the second 401 rather than looping', async () => {
+  it('gives up after the second 401', async () => {
     const fetchImpl = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () =>
       jsonResponse(401, { error: 'expired' }),
     );
@@ -149,7 +149,7 @@ describe('createFetchHttp', () => {
     expect(response).toEqual({ status: 502, body: { raw: '<html>bad gateway' } });
   });
 
-  it('treats an empty body as null rather than throwing on it', async () => {
+  it('treats an empty body as null', async () => {
     const fetchImpl = async () => ({ status: 204, text: async () => '' }) as Response;
 
     expect(await http(fetchImpl).send({ method: 'GET', path: '/v1/config' })).toEqual({

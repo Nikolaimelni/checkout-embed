@@ -2,12 +2,6 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compile } from 'sass';
 
-/**
- * The stylesheet has to reach the widget as a string, because a shadow root does not see
- * anything in document.head. A bundler plugin could do this, but then the same import
- * would need one mechanism under tsup, another under vitest and a third under tsc. A file
- * on disk works the same everywhere.
- */
 const source = resolve(process.cwd(), 'src/styles/widget.scss');
 const target = resolve(process.cwd(), 'src/styles/widget.generated.ts');
 

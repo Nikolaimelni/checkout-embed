@@ -9,8 +9,6 @@ import type { CheckoutState } from '@checkout-embed/core';
 
 export const TOTAL: Money = { amountMinor: 1000, currency: 'EUR' };
 
-// Next to the bench rather than on the mock provider, so the 3DS step also works where the
-// bench is hosted as static files.
 export const CHALLENGE_URL = new URL('challenge.html', document.baseURI).href;
 
 export const METHODS: readonly PaymentMethod[] = [
@@ -35,7 +33,6 @@ const intent: PaymentIntent = PaymentIntentSchema.parse({
   createdAt: '2026-09-04T10:00:00Z',
 });
 
-/** One entry per state of the machine. The stories below are generated from this. */
 export const STATES = {
   idle: { status: 'idle' },
   methods: { status: 'methods', methods: METHODS },

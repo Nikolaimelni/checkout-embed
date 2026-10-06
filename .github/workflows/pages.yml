@@ -1,6 +1,6 @@
 name: pages
 
-# Deploys what ci has just passed on main, so the demo never runs a build that failed.
+# Runs only after ci passes on main.
 on:
   workflow_run:
     workflows: [ci]
@@ -14,8 +14,6 @@ concurrency:
 permissions: {}
 
 jobs:
-  # The sandbox is the live demo: the real widget and the SDK's controller, with the provider
-  # simulated in the browser, so it runs as static files and needs no server.
   build:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
@@ -35,7 +33,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The trailing dots build the workspace packages the sandbox imports from their dist.
       - run: pnpm --filter "@checkout-embed/sandbox..." build
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

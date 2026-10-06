@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 import { migrate } from 'drizzle-orm/sqlite-proxy/migrator';
 import type { DatabaseHandle } from './client.ts';
 
-/** From the working directory: once bundled into dist/, import.meta.url is one level off. */
+// from cwd: once bundled into dist/, import.meta.url is one directory off
 export const DEFAULT_MIGRATIONS_DIR = 'drizzle';
 
 export async function applyMigrations(

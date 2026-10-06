@@ -9,8 +9,7 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Reads the code and nothing else. Every action below is pinned to a commit, because a tag
-# can be moved to point at something else after the fact.
+# Actions are pinned to commits, a tag can be moved after the fact.
 permissions:
   contents: read
 
@@ -37,7 +36,7 @@ jobs:
       - run: pnpm test
       - run: pnpm build
 
-      # After build, because the budget is measured on the artifact and not on the source.
+      # measured on the built files
       - run: pnpm size
 
   e2e:
@@ -54,8 +53,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # The demo hosts serve the built SDK, so there is nothing to run against until this
-      # has happened.
       - run: pnpm build
 
       - run: pnpm --filter @checkout-embed/e2e exec playwright install --with-deps chromium
@@ -66,8 +63,6 @@ jobs:
         if: failure()
         with:
           name: playwright-report
-          # The report and the traces. Retries are on in CI, so a flake leaves a trace of
-          # its second attempt behind.
           path: |
             e2e/playwright-report
             e2e/test-results
@@ -78,8 +73,6 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      # The deploy artifact, built and started. Fly should not be the first thing to find
-      # out that the Dockerfile is wrong.
       - run: docker build -f apps/mock-psp/Dockerfile -t checkout-embed-psp:ci .
 
       - name: the container comes up and reaches its database

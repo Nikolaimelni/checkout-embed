@@ -88,7 +88,7 @@ describe('createWebhookDispatcher', () => {
     expect(delivery?.lastError).toContain('ECONNREFUSED');
   });
 
-  it('gives up on a receiver that never answers instead of holding the queue', async () => {
+  it('gives up on a receiver that never answers', async () => {
     const fetcher: Fetcher = (_url, init) =>
       new Promise((_resolve, reject) => {
         init.signal?.addEventListener('abort', () => reject(new Error('receiver timed out')));

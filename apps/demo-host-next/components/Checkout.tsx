@@ -10,10 +10,7 @@ type Props = {
   readonly apiBaseUrl: string;
 };
 
-// Next knows nothing about the widget's shadow root or its React root, so the cleanup
-// below is what takes it out on client navigation.
 export function Checkout({ amount, apiBaseUrl }: Props) {
-  // State, not a ref, so the effect runs again when React hands it a different node.
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const router = useRouter();
 
@@ -33,7 +30,6 @@ export function Checkout({ amount, apiBaseUrl }: Props) {
     return () => {
       stopListening();
       mounted.unmount();
-      // Not terminate(): the instance is shared by everyone using this merchant key.
     };
   }, [host, amount, apiBaseUrl, router]);
 

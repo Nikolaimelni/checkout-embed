@@ -8,7 +8,6 @@ import { DEFAULT_LABELS, type Labels } from './labels.js';
 import { MethodIcon } from './MethodIcon.js';
 import { formatMoney } from './money.js';
 
-/** What instance.update() pushes in, derived from the schema that validates it. */
 export type HostState = Omit<Extract<HostMessage, { type: 'host/update' }>, 'type'>;
 
 export type HostComponents = {
@@ -73,8 +72,6 @@ export function CheckoutView({
         <p className="amount">{formatMoney(total, locale)}</p>
       </header>
 
-      {/* Always in the tree, never empty on arrival: a live region inserted at the same
-          moment as its text is not announced by most screen readers. */}
       <p className="visually-hidden" role="status" aria-live="polite">
         {host?.blockingMessage ?? announcementFor(state, labels)}
       </p>

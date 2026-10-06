@@ -9,10 +9,8 @@ export type DispatcherOptions = {
   readonly queue: WebhookQueue;
   readonly secret: string;
   readonly logger: Logger;
-  /** Unset means deliveries pile up in the table and nothing leaves the process. */
   readonly url?: string | undefined;
   readonly intervalMs?: number;
-  /** Per delivery. Ticks never overlap, so one receiver that hangs holds up everyone else. */
   readonly timeoutMs?: number;
   readonly fetcher?: Fetcher;
   readonly now?: () => number;
@@ -106,8 +104,6 @@ export function createWebhookDispatcher(options: DispatcherOptions): WebhookDisp
       }
 
       timer = setInterval(() => {
-        // Overlapping ticks would deliver the same row twice, and a webhook receiver that
-        // sees a duplicate is entitled to complain about it.
         if (running) return;
         running = true;
         void tick()

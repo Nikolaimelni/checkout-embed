@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Acme Hardware</title>
     <style>
-      /* A host page with opinions. The widget below is not supposed to notice any of it. */
       * {
         box-sizing: border-box;
         letter-spacing: 0.02em;
@@ -67,11 +66,7 @@
       <p id="receipt"></p>
     </main>
 
-    <!--
-      Not async. The loader is 1.6 kB, so blocking on it costs less than a
-      round trip, and it buys the next script a global that is guaranteed to exist.
-      The bundle it fetches is the asynchronous part, which is what the queue is for.
-    -->
+    <!-- not async: the inline script below needs the checkoutEmbed stub right away -->
     <script
       src="/sdk/loader.js"
       data-merchant-key="mk_test_acme"

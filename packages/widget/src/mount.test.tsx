@@ -34,7 +34,7 @@ function hostElement(tag = 'div'): Element {
 }
 
 describe('mountWidget', () => {
-  it('renders into a shadow root rather than into the host', () => {
+  it('renders into a shadow root', () => {
     const host = hostElement();
 
     const { view } = mount(host);
@@ -64,7 +64,7 @@ describe('mountWidget', () => {
     expect(view.shadowRoot.textContent).toContain('Payment complete');
   });
 
-  it('is idempotent: a second mount updates the first instead of stacking a second widget', () => {
+  it('is idempotent', () => {
     const host = hostElement();
     const { view: first } = mount(host);
 

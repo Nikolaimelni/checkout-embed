@@ -17,7 +17,6 @@ function driverFor(outcome: Outcome) {
   });
 }
 
-/** Lets the fake provider answer and the poll timer fire, without waiting for either. */
 const answer = () => vi.runAllTimersAsync();
 
 async function opened(outcome: Outcome) {
@@ -138,7 +137,6 @@ describe('createDriver', () => {
     driver.start();
     await answer();
 
-    // The machine has no transition for this one, so nobody should be woken up for it.
     driver.handle({ type: 'challenge-finished' });
 
     expect(notifications).toBe(1);

@@ -37,7 +37,6 @@ describe('toFailure', () => {
   });
 
   it('falls back to the error name when the message is empty', () => {
-    // AbortError arrives this way from more than one browser.
     expect(toFailure(new Error())).toEqual({ code: 'unknown', message: 'Error' });
   });
 

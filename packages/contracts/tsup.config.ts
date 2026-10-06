@@ -6,7 +6,6 @@ export default defineConfig({
   target: 'es2023',
   sourcemap: true,
   clean: true,
-  // Declarations come from tsc, not from tsup. Its dts step bundles its own TypeScript 5.7
-  // and crashes against the native TypeScript 7 compiler this workspace uses.
+  // tsup's dts step bundles TypeScript 5.7 and fails on 7, so tsc writes the .d.ts
   dts: false,
 });

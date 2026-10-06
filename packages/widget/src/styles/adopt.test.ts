@@ -25,7 +25,7 @@ describe('adoptViaStyleElement', () => {
     expect(document.head.querySelector('style')).toBeNull();
   });
 
-  it('puts it first, so anything the widget renders can override it', () => {
+  it('puts it first', () => {
     const root = shadowRoot();
     root.append(document.createElement('div'));
 
@@ -51,8 +51,6 @@ describe('adoptViaConstructable', () => {
     restore = null;
   });
 
-  // Each case uses its own stylesheet text: sheets are cached per window per text, and the
-  // stand-in class is replaced between cases.
   it('shares one sheet across roots and detaches it from only one', () => {
     restore = installConstructableStyleSheets(window);
     const first = shadowRoot();
@@ -124,8 +122,6 @@ describe('adoptStyles', () => {
   });
 
   it('is running against a jsdom that still has no constructable stylesheets', () => {
-    // If this starts failing, jsdom grew support, the fallback stopped being the branch
-    // component tests take, and the stand-in above is no longer earning its keep.
     expect(supportsConstructableStyleSheets(window)).toBe(false);
   });
 });

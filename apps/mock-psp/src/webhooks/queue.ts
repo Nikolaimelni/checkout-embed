@@ -9,7 +9,6 @@ export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export type DeliveryRow = typeof webhookDeliveries.$inferSelect;
 
-/** Parked rather than deleted, so an abandoned delivery is still there to look at. */
 export const ABANDONED_AT = 8_640_000_000_000_000;
 
 export type EnqueueInput = {
@@ -38,8 +37,6 @@ export function createWebhookQueue(db: Database): WebhookQueue {
         id: `whd_${randomUUID()}`,
         intentId,
         event,
-        // Serialised once, at enqueue time. The signature covers these exact bytes, so
-        // re-encoding on the way out would invalidate it.
         payload: JSON.stringify(payload),
         attempts: 0,
         nextAttemptAt: now,

@@ -98,7 +98,7 @@ describe('mount', () => {
     expect(document.querySelector('#pay-here')?.shadowRoot?.textContent).toContain('Card');
   });
 
-  it('asks the provider for the method list once, however many widgets it mounts', async () => {
+  it('asks the provider for the method list once', async () => {
     const psp = createFakePsp();
     const instance = instanceWith(psp);
 
@@ -146,7 +146,7 @@ describe('mount', () => {
     );
   });
 
-  it('reports a provider that will not answer instead of showing a spinner forever', async () => {
+  it('reports a provider that will not answer', async () => {
     const element = host();
     const failed = vi.fn();
     const instance = init({
@@ -173,7 +173,7 @@ describe('mount', () => {
     expect(element.shadowRoot?.textContent).toBe('');
   });
 
-  it('ignores a second unmount rather than tearing down twice', async () => {
+  it('ignores a second unmount', async () => {
     const element = host();
     const handle = instanceWith().mount(element, { amount });
     await settled();

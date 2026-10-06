@@ -24,7 +24,6 @@ import type { CheckoutApi } from './client.js';
 
 export const DEFAULT_POLL_INTERVAL_MS = 1_500;
 
-/** Statuses that can still end in a charge, or already have. */
 const LIVE: ReadonlySet<PaymentIntentStatus> = new Set([
   'requires_action',
   'processing',
@@ -46,23 +45,18 @@ export type ControllerOptions = {
 
 export type CheckoutController = WidgetStore & {
   handle(intent: WidgetIntent): void;
-  /** Loads the method list. Separate from construction so a caller can mount first. */
   start(): void;
   dispose(): void;
 };
 
-/** One attempt to pay. Its key and intent outlive a failure that came with no answer, so a
- * retry asks the provider before paying again. */
 type Attempt = {
   readonly key: string;
   readonly methodId: PaymentMethodId;
   readonly abort: AbortController;
   intentId: PaymentIntentId | null;
-  /** A request of this attempt is on the wire, and a second click on Pay waits for it. */
   busy: boolean;
 };
 
-/** Turns what the widget reports into HTTP calls, and the answers into reducer actions. */
 export function createCheckoutController(options: ControllerOptions): CheckoutController {
   const { api, events, merchantKey, total } = options;
   const logger = options.logger ?? silentLogger;
@@ -99,7 +93,6 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     }
   }
 
-  /** False when the machine refused the action, which tells an async flow to stop. */
   function dispatch(action: CheckoutAction): boolean {
     if (disposed) return false;
 
@@ -110,9 +103,6 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
     state = next;
     for (const listener of listeners) listener();
 
-    // Events are derived from where the machine landed, not from the call site that got it
-    // there. A payment that times out during polling fails inside the reducer, and this is
-    // what makes the merchant hear about that one too.
     announce(previous, next);
     return true;
   }
@@ -128,14 +118,11 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
   function run(work: () => Promise<void>, owner: Attempt | null = null): void {
     void work().catch((cause: unknown) => {
-      // An attempt we aborted ourselves has nothing to report: the screen has moved on.
       if (disposed || owner?.abort.signal.aborted) return;
       fail(cause);
     });
   }
 
-  /** The same method keeps its key, so a replay returns the same intent. Another method is
-   * another request body, which needs a key of its own. */
   function attemptFor(methodId: PaymentMethodId): Attempt {
     const kept = attempt?.methodId === methodId ? attempt : null;
     attempt = {
@@ -188,7 +175,6 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           return;
         }
 
-        // The reducer fails the payment once the poll budget is spent, which ends this loop.
         if (dispatch({ type: 'poll/tick', intent }) && state.status === 'polling') schedule();
       });
     };
@@ -243,13 +229,10 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
         return;
 
       case 'requires_confirmation':
-        // Nothing has happened to it yet. The confirm call is what moves it on.
         return;
     }
   }
 
-  /** Checks an intent an earlier attempt left behind. True when the screen now follows it,
-   * or when the customer moved on while it was being read. */
   async function resumed(intentId: PaymentIntentId, current: Attempt): Promise<boolean> {
     const intent = await api.readIntent(intentId, current.abort.signal);
     if (current.abort.signal.aborted) return true;
@@ -270,6 +253,7 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
     run(async () => {
       try {
+        // a new method means a new intent, so first make sure the old one is not still settling
         if (earlier?.intentId && (await resumed(earlier.intentId, current))) return;
 
         const created = await api.createIntent(
@@ -280,11 +264,9 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
         if (current.abort.signal.aborted) return;
         current.intentId = created.id;
 
-        // False when Back, a reset or a teardown got here first. An unconfirmed intent is never
-        // charged.
         if (!dispatch({ type: 'intent/created', intent: created })) return;
 
-        // A replayed key can hand back an intent that was confirmed last time round.
+        // a replayed key can return an intent that was already confirmed
         if (created.status !== 'requires_confirmation') {
           apply(created);
           return;
@@ -310,13 +292,10 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
     const intentId = pending?.intentId ?? null;
     if (pending === null || intentId === null || !reopen(pending.methodId)) {
-      // The list may be stale, or empty if loading it failed. A kept attempt with no intent
-      // replays its key on the next Pay.
       loadMethods();
       return;
     }
 
-    // The confirm may have landed without an answer, so ask before charging again.
     const resumed = attemptFor(pending.methodId);
     resumed.busy = true;
 
@@ -325,7 +304,6 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
         const intent = await api.readIntent(intentId, resumed.abort.signal);
         if (resumed.abort.signal.aborted) return;
 
-        // Never confirmed: the details screen is up already, and Pay replays the same key.
         if (intent.status === 'requires_confirmation') return;
         if (dispatch({ type: 'intent/created', intent })) apply(intent);
       } finally {
@@ -374,7 +352,6 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
 
         case 'challenge-dismissed':
           if (state.status !== 'requires_action') return;
-          // The attempt keeps the open intent, so Try again reopens the same challenge.
           dispatch({
             type: 'payment/failed',
             failure: {
@@ -389,8 +366,8 @@ export function createCheckoutController(options: ControllerOptions): CheckoutCo
           retry();
           return;
 
+        // Close keeps the attempt: a timed out payment can still settle
         case 'dismiss':
-          // Close keeps the attempt: a payment that timed out or lost its challenge can still settle.
           abandonRequests();
           stopPolling();
           if (dispatch({ type: 'checkout/reset' })) loadMethods();

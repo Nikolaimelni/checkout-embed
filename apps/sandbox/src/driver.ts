@@ -23,9 +23,7 @@ export type DriverOptions = {
   readonly total: Money;
   readonly outcome: Outcome;
   readonly challengeUrl: string;
-  /** How long the fake provider takes to answer, and the poll interval. */
   readonly latencyMs?: number;
-  /** Where the events a merchant would subscribe to go. */
   readonly events?: EventBus;
 };
 
@@ -35,7 +33,6 @@ const SANDBOX_KEY = MerchantKeySchema.parse('mk_sandbox');
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-/** An in-memory provider that answers the way the mock one does. */
 function createSandboxProvider(options: DriverOptions) {
   const latencyMs = options.latencyMs ?? 500;
   let status: PaymentIntentStatus = 'requires_confirmation';
@@ -94,7 +91,6 @@ function createSandboxProvider(options: DriverOptions) {
   };
 }
 
-/** The SDK's controller against that provider, so the bench behaves like the real widget. */
 export function createDriver(options: DriverOptions): Driver {
   const provider = createSandboxProvider(options);
   const controller = createCheckoutController({
@@ -108,7 +104,6 @@ export function createDriver(options: DriverOptions): Driver {
   return {
     ...controller,
     handle(intent) {
-      // The provider's own page would record this. In the sandbox the click is all there is.
       if (intent.type === 'challenge-finished') provider.finishChallenge();
       controller.handle(intent);
     },

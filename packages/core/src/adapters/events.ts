@@ -29,12 +29,11 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
       const registered = listeners.get(event.type);
       if (!registered) return;
 
-      // A copy, so a listener can unsubscribe itself without skipping the next one.
+      // a copy, so a listener can unsubscribe itself mid-emit
       for (const listener of [...registered]) {
         try {
           listener(event);
         } catch (cause) {
-          // A merchant's listener throwing is no reason to abandon the payment.
           logger.log('error', 'checkout: event listener threw', { event: event.type, cause });
         }
       }
@@ -42,16 +41,14 @@ export function createEventBus(options: EventBusOptions = {}): EventBus {
 
     on(type, listener) {
       const registered = listeners.get(type) ?? new Set<AnyListener>();
-      // why: the map is keyed by event type, so the listener only ever receives events of
-      // the type it registered for. TypeScript cannot see through the map to prove it.
+      // why: the map is keyed by type, so a listener only gets its own events; TS cannot see that
       const erased = listener as AnyListener;
       registered.add(erased);
       listeners.set(type, registered);
 
       return () => {
         registered.delete(erased);
-        // After a second call or clear() this set is stale, and deleting by type would drop
-        // whoever subscribed since.
+        // after clear() or a second off() this set is stale, and deleting by type would drop newer listeners
         if (registered.size === 0 && listeners.get(type) === registered) listeners.delete(type);
       };
     },

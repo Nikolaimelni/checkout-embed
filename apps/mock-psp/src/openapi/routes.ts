@@ -3,8 +3,6 @@ import { dirname } from 'node:path';
 import express, { Router } from 'express';
 import { buildOpenApiDocument } from './document.ts';
 
-// The package has no exports map, so resolving its manifest is the stable way to find the
-// static assets without importing anything from it.
 const SWAGGER_UI_PATH = dirname(
   createRequire(import.meta.url).resolve('swagger-ui-dist/package.json'),
 );
@@ -38,7 +36,6 @@ export function docsRouter(publicBaseUrl: string): Router {
   const router = Router();
   const document = buildOpenApiDocument(publicBaseUrl);
 
-  // Swagger UI injects inline styles. Scoped to /docs because this router sits at the app root.
   router.use('/docs', (_request, response, next) => {
     response.setHeader(
       'Content-Security-Policy',
@@ -56,7 +53,6 @@ export function docsRouter(publicBaseUrl: string): Router {
   });
 
   router.get('/docs/init.js', (_request, response) => {
-    // A file rather than an inline script, so the page needs no script-src exception.
     response.type('js').send(INIT_SCRIPT);
   });
 

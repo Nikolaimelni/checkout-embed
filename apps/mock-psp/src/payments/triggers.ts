@@ -2,7 +2,6 @@ export const OUTCOMES = ['succeed', 'decline', 'require_action', 'stall'] as con
 
 export type Outcome = (typeof OUTCOMES)[number];
 
-/** Trigger amounts instead of randomness, so a demo can be steered and a test repeats. */
 export const TRIGGERS: readonly { readonly amountMinor: number; readonly outcome: Outcome }[] = [
   { amountMinor: 1000, outcome: 'succeed' },
   { amountMinor: 1051, outcome: 'decline' },
@@ -18,8 +17,6 @@ export function outcomeFor(amountMinor: number): Outcome {
   return BY_AMOUNT.get(amountMinor) ?? 'succeed';
 }
 
-/** How long a confirmed payment stays in processing before it settles. */
 export const SETTLE_DELAY_MS = 1_500;
 
-/** Far enough away that the widget's poll budget runs out first, which is the point. */
 export const NEVER_SETTLES_MS = 365 * 24 * 60 * 60 * 1_000;

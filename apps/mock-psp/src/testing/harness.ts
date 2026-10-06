@@ -11,7 +11,6 @@ export const MERCHANT_KEY = 'mk_test_acme';
 export const BEARER = 'Bearer test-token';
 export const PUBLIC_BASE_URL = 'https://psp.test';
 
-/** A clock the tests move by hand, so settlement is a fact rather than a wait. */
 export type Clock = {
   now(): number;
   advance(ms: number): void;
@@ -26,7 +25,6 @@ export type Harness = {
   close(): void;
 };
 
-/** Rate limiting is off unless a case asks for it: a counter shared across cases is flaky. */
 export async function createHarness(
   startAt = 1_760_000_000_000,
   rateLimit: RateLimitOptions | false = false,

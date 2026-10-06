@@ -2,11 +2,6 @@ import { CheckoutView } from '@checkout-embed/widget';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { STATES, TOTAL } from '../fixtures';
 
-/**
- * One story per state of the payment machine. The screens are pure: they take a state and
- * report what somebody did with it, so a story is the state and nothing else. Anything
- * that needs the network lives in the bench.
- */
 const meta = {
   title: 'Checkout/View',
   component: CheckoutView,
@@ -40,7 +35,6 @@ export const Failed: Story = { args: { state: STATES.failed } };
 
 export const FailedForGood: Story = { args: { state: STATES.failedFinal } };
 
-/** The merchant hands us their own button and we render it in place of ours. */
 export const WithAHostButton: Story = {
   args: { state: STATES.details, components: { button: 'acme-button' } },
   loaders: [

@@ -24,13 +24,11 @@ export type PaymentsService = {
     owner: string,
   ): Promise<PaymentIntent>;
   read(id: string, owner: string): Promise<PaymentIntent>;
-  /** Throws unless the link is for an open challenge. */
   openChallenge(id: string, token: string): Promise<void>;
   completeChallenge(id: string, token: string, approved: boolean): Promise<PaymentIntent>;
   settleDue(): Promise<number>;
 };
 
-/** Out through the published schema, so a new column cannot leak into the API. */
 function toDto(row: IntentRow): PaymentIntent {
   return PaymentIntentSchema.parse({
     id: row.id,
@@ -42,7 +40,6 @@ function toDto(row: IntentRow): PaymentIntent {
   });
 }
 
-/** Primitives in a fixed order, so the hash does not rest on an object's key order. */
 function hashRequest(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
 }
@@ -57,7 +54,6 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
   const { repository, webhooks, publicBaseUrl } = options;
   const now = options.now ?? Date.now;
 
-  /** Someone else's intent answers like a missing one, so a known id is not enough. */
   async function mustOwn(id: string, owner: string): Promise<IntentRow> {
     const row = await repository.byId(id);
     if (!row || row.ownerHash !== owner) {
@@ -66,7 +62,6 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
     return row;
   }
 
-  /** A wrong token, a used one and an intent with no challenge all look the same. */
   async function openChallengeRow(id: string, token: string): Promise<IntentRow> {
     const row = await repository.byId(id);
     const expected = row?.status === 'requires_action' ? row.challengeToken : null;
@@ -159,8 +154,6 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
       const hash = hashRequest(['confirm', id, body.methodId]);
       const seen = await repository.findKey(row.merchantKey, idempotencyKey);
 
-      // A confirm whose answer got lost comes back under the same key and gets the intent as
-      // it stands, rather than a 409 the SDK would have to read as a failed payment.
       if (seen) {
         if (seen.requestHash !== hash) {
           throw new ApiError(
@@ -185,7 +178,6 @@ export function createPaymentsService(options: PaymentsServiceOptions): Payments
           case 'decline':
             return { status: 'failed', methodId: body.methodId, updatedAt: at };
           case 'require_action': {
-            // The link is the only credential the challenge page gets, so it carries a secret.
             const challengeToken = randomBytes(24).toString('base64url');
             return {
               status: 'requires_action',

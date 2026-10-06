@@ -6,14 +6,6 @@ export type Outstanding = {
   readonly nodes: number;
 };
 
-/**
- * Counting what the widget leaves behind needs the counters in place before any of its
- * code runs, so this goes in as an init script rather than an evaluate.
- *
- * It watches window and document only. Listeners on nodes inside the shadow root go away
- * with the nodes; the ones that outlive a teardown are always the ones attached to
- * something the widget does not own.
- */
 export const INSTRUMENT = `
   (() => {
     const state = { timers: new Set(), listeners: 0 };
@@ -21,7 +13,6 @@ export const INSTRUMENT = `
 
     const originalTimeout = window.setTimeout.bind(window);
     window.setTimeout = (handler, delay, ...rest) => {
-      // A timeout that has fired is gone, not leaked, so it leaves the count as it runs.
       const id = originalTimeout((...args) => {
         state.timers.delete(id);
         if (typeof handler === 'function') handler(...args);

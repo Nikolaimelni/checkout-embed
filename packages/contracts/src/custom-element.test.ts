@@ -19,8 +19,6 @@ describe('CustomElementNameSchema', () => {
   it.each(['annotation-xml', 'color-profile', 'font-face', 'missing-glyph'])(
     'rejects the reserved name %s',
     (name) => {
-      // customElements.define throws on these, and an uncaught throw inside registration
-      // takes the whole widget down with it.
       expect(CustomElementNameSchema.safeParse(name).success).toBe(false);
     },
   );

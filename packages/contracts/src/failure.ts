@@ -14,7 +14,6 @@ export const CheckoutErrorCodeSchema = zEnum([
 
 export type CheckoutErrorCode = z.infer<typeof CheckoutErrorCodeSchema>;
 
-/** A failure as it crosses the host boundary. Inside the widget it is a CheckoutError. */
 export const CheckoutFailureSchema = object({
   code: CheckoutErrorCodeSchema,
   message: string().min(1),

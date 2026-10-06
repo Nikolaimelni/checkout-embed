@@ -10,14 +10,12 @@ export type RequestContext = {
 
 const storage = new AsyncLocalStorage<RequestContext>();
 
-/** Echoed into a header and every log line, so only a plain token is taken from outside. */
 const REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/;
 
 export function createRootLogger(level: string): Logger {
   return pino({ level, base: { service: 'mock-psp' } });
 }
 
-/** The current request's logger, request id included, without threading it through calls. */
 export function log(): Logger {
   const context = storage.getStore();
   if (context) return context.log;

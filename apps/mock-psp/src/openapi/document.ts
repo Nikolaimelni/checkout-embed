@@ -9,7 +9,6 @@ import { TRIGGERS } from '../payments/triggers.ts';
 
 type JsonSchema = Record<string, unknown>;
 
-/** Built from the schemas the routes validate with, so the document cannot drift. */
 function jsonSchema(schema: z.ZodType<unknown>, io: 'input' | 'output'): JsonSchema {
   const { $schema, ...rest } = z.toJSONSchema(schema, {
     target: 'draft-2020-12',
@@ -104,8 +103,7 @@ export function buildOpenApiDocument(publicBaseUrl: string): Record<string, unkn
       '/v1/payment-intents/{id}': {
         get: {
           summary: 'Read a payment intent',
-          description:
-            'A processing intent settles here once its delay has passed, which is what makes polling work without a scheduler.',
+          description: 'A processing intent settles here once its delay has passed.',
           security: bearer,
           parameters: [intentId],
           responses: {

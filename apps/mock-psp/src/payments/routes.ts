@@ -29,7 +29,6 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
     validate({ body: CreateIntentBodySchema }),
     async (_request, response) => {
       const { body } = validated<CreateIntentBody>(response);
-      // The answer the config route gives, so an unregistered key cannot open intents either.
       if (!known.has(body.merchantKey)) {
         throw new ApiError('not_found', `No merchant is registered under ${body.merchantKey}.`);
       }
@@ -40,7 +39,6 @@ export function paymentsRouter(service: PaymentsService, merchantKeys: readonly 
         ownerOf(response),
       );
 
-      // 201 the first time, 200 on a replay.
       response.status(replayed ? 200 : 201).json(intent);
     },
   );

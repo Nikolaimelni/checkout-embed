@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import { createDriver, OUTCOMES, type Outcome } from './driver';
 import { CHALLENGE_URL, METHODS, TOTAL } from './fixtures';
 
-/** What real resets and design systems do: the universal selector with !important. */
 const HOSTILE_CSS = `
   * {
     color: #d40000 !important;
@@ -25,7 +24,6 @@ const OUTCOME_LABELS: Readonly<Record<Outcome, string>> = {
   require_action: '3DS check',
 };
 
-// Two lines that add up to TOTAL, so the summary and the widget agree.
 const ORDER: readonly { readonly label: string; readonly amountMinor: number }[] = [
   { label: 'Bench vice, 150 mm', amountMinor: 850 },
   { label: 'Delivery', amountMinor: 150 },
@@ -44,7 +42,6 @@ const money = (amountMinor: number): string =>
   formatMoney({ amountMinor, currency: TOTAL.currency } satisfies Money, LOCALE);
 
 export function Bench() {
-  // State, not a ref: the container is a new element after the toggle below removes it.
   const [host, setHost] = useState<HTMLDivElement | null>(null);
   const [outcome, setOutcome] = useState<Outcome>('succeed');
   const [hostile, setHostile] = useState(false);
@@ -52,7 +49,6 @@ export function Bench() {
   const [log, setLog] = useState<readonly Entry[]>([]);
   const nextEntryId = useRef(0);
 
-  // Syncs with the widget, which has a shadow root and a React root of its own.
   useEffect(() => {
     if (!host) return;
 
@@ -67,7 +63,6 @@ export function Bench() {
       setLog((entries) => [entry, ...entries].slice(0, 12));
     };
 
-    // What a shop would subscribe to with checkout.on(...).
     const events = createEventBus();
     const unsubscribe = [
       events.on('method:selected', (event) => record('shop', `method:selected ${event.methodId}`)),
@@ -102,7 +97,6 @@ export function Bench() {
     };
   }, [host, outcome]);
 
-  // Syncs React with document.head, which is where a shop's stylesheet lives.
   useEffect(() => {
     if (!hostile) return;
 

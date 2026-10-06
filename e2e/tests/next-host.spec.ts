@@ -17,11 +17,8 @@ test.describe('a server rendered page with a client widget', () => {
   }) => {
     const html = await (await request.get(`${NEXT}/cart`)).text();
 
-    // The page itself came off the server with its content in it, which is the only reason
-    // this app is here rather than another plain HTML file.
     expect(html).toContain('This page is server rendered');
     expect(html).toContain('49.99');
-    // And the widget did not, because it needs a shadow root to exist first.
     expect(html).not.toContain('Choose how to pay');
 
     await openCart(page);
@@ -34,7 +31,6 @@ test.describe('a server rendered page with a client widget', () => {
     await page.getByRole('link', { name: 'Leave without paying' }).click();
 
     await expect(page.getByText('The order is on its way.')).toBeVisible();
-    // A client navigation, not a reload: the router swapped the tree without a round trip.
     await expect(page).toHaveURL(`${NEXT}/success`);
     await expect(widget(page)).toHaveCount(0);
   });
@@ -51,9 +47,6 @@ test.describe('a server rendered page with a client widget', () => {
     await page.addInitScript(INSTRUMENT);
     await openCart(page);
 
-    // Three round trips. The absolute counts belong to the plain host, where no router is
-    // adding its own; what this page can answer is whether tearing the widget down inside
-    // somebody else's render pass is quiet, and whether the shadow root really empties.
     for (let round = 0; round < 3; round += 1) {
       await page.getByRole('link', { name: 'Leave without paying' }).click();
       await expect(page.getByText('The order is on its way.')).toBeVisible();
@@ -66,8 +59,6 @@ test.describe('a server rendered page with a client widget', () => {
     const left = await outstanding(page, '#checkout');
     expect(left.nodes).toBeGreaterThan(0);
 
-    // React warns when a root is unmounted synchronously from inside a render, which is
-    // exactly what a host calling unmount() from an effect cleanup would cause.
     expect(complaints).toEqual([]);
   });
 
