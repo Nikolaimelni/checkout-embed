@@ -9,6 +9,7 @@
     "pnpm": ">=10"
   },
   "scripts": {
+    "dev": "nx run @checkout-embed/sdk:build && pnpm --filter @checkout-embed/sandbox dev",
     "build": "nx run-many -t build",
     "typecheck": "nx run-many -t typecheck",
     "test": "nx run-many -t test",
