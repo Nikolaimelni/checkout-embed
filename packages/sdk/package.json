@@ -1,6 +1,6 @@
 {
   "name": "@checkout-embed/sdk",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The loader, the call queue and the public lifecycle a merchant integrates against",
   "license": "MIT",
   "type": "module",

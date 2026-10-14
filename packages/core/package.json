@@ -1,6 +1,6 @@
 {
   "name": "@checkout-embed/core",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Payment state machine and adapter ports, free of any DOM dependency",
   "license": "MIT",
   "type": "module",
