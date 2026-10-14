@@ -1,6 +1,6 @@
 {
   "name": "@checkout-embed/widget",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "The checkout UI, rendered into a shadow root so the host page cannot reach it",
   "license": "MIT",
   "type": "module",
