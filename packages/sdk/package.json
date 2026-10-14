@@ -58,7 +58,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@size-limit/preset-small-lib": "^13.0.3",
+    "@size-limit/preset-small-lib": "^14.2.0",
     "jsdom": "^30.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
