@@ -1,6 +1,6 @@
 # The build stage bundles the server with its dependencies, the runtime stage installs nothing.
 
-FROM node:24-slim AS build
+FROM node:25-slim AS build
 RUN corepack enable
 WORKDIR /repo
 COPY . .
@@ -9,7 +9,7 @@ RUN pnpm --filter "@checkout-embed/mock-psp..." build
 # -L because pnpm symlinks it from the store
 RUN cp -rL apps/mock-psp/node_modules/swagger-ui-dist /swagger-ui-dist
 
-FROM node:24-slim
+FROM node:25-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
